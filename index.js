@@ -31,15 +31,15 @@ class SolisCloudAPI {
         this._gridExportCharacteristic = this.createNumericCharacteristic("Grid Export (kW)", "e2b6f0f5-1234-4a56-90ab-cdef12345605", 0, 10000, 0.01, "kW");
         this._batteryPercentCharacteristic = this.createNumericCharacteristic("Battery %", "e2b6f0f6-1234-4a56-90ab-cdef12345616", 0, 100, 1, "%");
 
-        this._dayEnergyCharacteristic = this.createNumericCharacteristic("PV Today Energy (kWh)", "e2b6f0f6-1234-4a56-90ab-cdef12345606", 0, 10000, 0.01, "kWh");
-        this._monthEnergyCharacteristic = this.createNumericCharacteristic("PV Month Energy (kWh)", "e2b6f0f7-1234-4a56-90ab-cdef12345607", 0, 100000, 0.01, "kWh");
-        this._yearEnergyCharacteristic = this.createNumericCharacteristic("PV Year Energy (kWh)", "e2b6f0f8-1234-4a56-90ab-cdef12345608", 0, 100000, 0.01, "kWh");
-        this._totalEnergyCharacteristic = this.createNumericCharacteristic("PV Total Energy (kWh)", "e2b6f0f9-1234-4a56-90ab-cdef12345609", 0, 1000000, 0.01, "kWh");
+        this._dayPvEnergyCharacteristic = this.createNumericCharacteristic("PV Today Energy (kWh)", "e2b6f0f6-1234-4a56-90ab-cdef12345606", 0, 10000, 0.01, "kWh");
+        this._monthPvEnergyCharacteristic = this.createNumericCharacteristic("PV Month Energy (kWh)", "e2b6f0f7-1234-4a56-90ab-cdef12345607", 0, 100000, 0.01, "kWh");
+        this._yearPvEnergyCharacteristic = this.createNumericCharacteristic("PV Year Energy (kWh)", "e2b6f0f8-1234-4a56-90ab-cdef12345608", 0, 100000, 0.01, "kWh");
+        this._totalPvEnergyCharacteristic = this.createNumericCharacteristic("PV Total Energy (kWh)", "e2b6f0f9-1234-4a56-90ab-cdef12345609", 0, 1000000, 0.01, "kWh");
 
-        this._gridPurchasedEnergyCharacteristic = this.createNumericCharacteristic("Grid Purchased Today (kWh)", "e2b6f0fc-1234-4a56-90ab-cdef1234560c", 0, 10000, 0.01, "kWh");
-        this._gridSellEnergyCharacteristic = this.createNumericCharacteristic("Grid Sold Today (kWh)", "e2b6f0fd-1234-4a56-90ab-cdef1234560d", 0, 10000, 0.01, "kWh");
+        this._dayGridPurchasedEnergyCharacteristic = this.createNumericCharacteristic("Grid Purchased Today (kWh)", "e2b6f0fc-1234-4a56-90ab-cdef1234560c", 0, 10000, 0.01, "kWh");
+        this._dayGridSellEnergyCharacteristic = this.createNumericCharacteristic("Grid Sold Today (kWh)", "e2b6f0fd-1234-4a56-90ab-cdef1234560d", 0, 10000, 0.01, "kWh");
 
-        this._houseLoadEnergyCharacteristic = this.createNumericCharacteristic("House Load Today (kWh)", "e2b6f0fe-1234-4a56-90ab-cdef1234560e", 0, 10000, 0.01, "kWh");
+        this._dayHouseLoadEnergyCharacteristic = this.createNumericCharacteristic("House Load Today (kWh)", "e2b6f0fe-1234-4a56-90ab-cdef1234560e", 0, 10000, 0.01, "kWh");
 
         // --- SINGLE ENERGY SERVICE ---
         this.energyService = new Service.AccessoryInformation("Solis Energy", "solisEnergy");
@@ -49,13 +49,13 @@ class SolisCloudAPI {
         this.energyService.addCharacteristic(this._gridImportCharacteristic);
         this.energyService.addCharacteristic(this._gridExportCharacteristic);
         this.energyService.addCharacteristic(this._batteryPercentCharacteristic);
-        this.energyService.addCharacteristic(this._dayEnergyCharacteristic);
-        this.energyService.addCharacteristic(this._monthEnergyCharacteristic);
-        this.energyService.addCharacteristic(this._yearEnergyCharacteristic);
-        this.energyService.addCharacteristic(this._totalEnergyCharacteristic);
-        this.energyService.addCharacteristic(this._gridPurchasedEnergyCharacteristic);
-        this.energyService.addCharacteristic(this._gridSellEnergyCharacteristic);
-        this.energyService.addCharacteristic(this._houseLoadEnergyCharacteristic);
+        this.energyService.addCharacteristic(this._dayPvEnergyCharacteristic);
+        this.energyService.addCharacteristic(this._monthPvEnergyCharacteristic);
+        this.energyService.addCharacteristic(this._yearPvEnergyCharacteristic);
+        this.energyService.addCharacteristic(this._totalPvEnergyCharacteristic);
+        this.energyService.addCharacteristic(this._dayGridPurchasedEnergyCharacteristic);
+        this.energyService.addCharacteristic(this._dayGridSellEnergyCharacteristic);
+        this.energyService.addCharacteristic(this._dayHouseLoadEnergyCharacteristic);
 
         this.updateData();
         setInterval(() => this.updateData(), this.apiInterval * 1000);
@@ -145,13 +145,13 @@ class SolisCloudAPI {
                 houseLoad: safe(r.familyLoadPower),
                 gridImport: r.psum < 0 ? Math.abs(safe(r.psum)) : 0,
                 gridExport: r.psum > 0 ? safe(r.psum) : 0,
-                dayEnergy: safe(r.dayEnergy),
-                monthEnergy: safe(r.monthEnergy),
-                yearEnergy: safe(r.yearEnergy),
-                totalEnergy: safe(r.allEnergy),
-                gridPurchased: safe(r.gridPurchasedDayEnergy),
-                gridSold: safe(r.gridSellDayEnergy),
-                houseLoadEnergy: safe(r.homeLoadTodayEnergy)
+                dayPvEnergy: safe(r.dayEnergy),
+                monthPvEnergy: safe(r.monthEnergy),
+                yearPvEnergy: safe(r.yearEnergy),
+                totalPvEnergy: safe(r.allEnergy),
+                dayGridPurchased: safe(r.gridPurchasedDayEnergy),
+                dayGridSold: safe(r.gridSellDayEnergy),
+                dayHouseLoadEnergy: safe(r.homeLoadTodayEnergy)
             };
 
             this.log.info("[Solis] Cache updated:", this.cache);
@@ -172,15 +172,15 @@ class SolisCloudAPI {
             this.energyService.getCharacteristic(this._gridExportCharacteristic).updateValue(c.gridExport);
             this.energyService.getCharacteristic(this._batteryPercentCharacteristic).updateValue(c.batteryPercent);
 
-            this.energyService.getCharacteristic(this._dayEnergyCharacteristic).updateValue(c.dayEnergy);
-            this.energyService.getCharacteristic(this._monthEnergyCharacteristic).updateValue(c.monthEnergy);
-            this.energyService.getCharacteristic(this._yearEnergyCharacteristic).updateValue(c.yearEnergy);
-            this.energyService.getCharacteristic(this._totalEnergyCharacteristic).updateValue(c.totalEnergy);
+            this.energyService.getCharacteristic(this._dayPvEnergyCharacteristic).updateValue(c.dayPvEnergy);
+            this.energyService.getCharacteristic(this._monthPvEnergyCharacteristic).updateValue(c.monthPvEnergy);
+            this.energyService.getCharacteristic(this._yearPvEnergyCharacteristic).updateValue(c.yearPvEnergy);
+            this.energyService.getCharacteristic(this._totalPvEnergyCharacteristic).updateValue(c.totalPvEnergy);
 
-            this.energyService.getCharacteristic(this._gridPurchasedEnergyCharacteristic).updateValue(c.gridPurchased);
-            this.energyService.getCharacteristic(this._gridSellEnergyCharacteristic).updateValue(c.gridSold);
+            this.energyService.getCharacteristic(this._dayGridPurchasedEnergyCharacteristic).updateValue(c.dayGridPurchased);
+            this.energyService.getCharacteristic(this._dayGridSellEnergyCharacteristic).updateValue(c.dayGridSold);
 
-            this.energyService.getCharacteristic(this._houseLoadEnergyCharacteristic).updateValue(c.houseLoadEnergy);
+            this.energyService.getCharacteristic(this._dayHouseLoadEnergyCharacteristic).updateValue(c.dayHouseLoadEnergy);
 
         } catch (err) {
             this.log.error("Failed to update sensors:", err);
