@@ -35,8 +35,9 @@ This plugin exposes the following HomeKit characteristics via a **single service
 Install via npm globally:
 
 ```bash
-sudo npm install -g homebridge-solis-cloud-api
-
+cd /var/lib/homebridge
+sudo npm install --unsafe-perm homebridge-solis-cloud-api
+sudo systemctl restart homebridge
 ```
 Example Config:
 ```
