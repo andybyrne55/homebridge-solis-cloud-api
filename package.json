@@ -1,6 +1,6 @@
 {
   "name": "homebridge-solis-cloud-api",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Homebridge plugin for reading data from Solis Cloud API",
   "main": "index.js",
   "keywords": [
@@ -12,6 +12,13 @@
   },
   "author": "Andrew Byrne",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git:/github.com/andybyrne55/homebridge-solis-cloud-api.git"
+  },
+  "bugs": {
+    "url": "https://github.com/andybyrne55/homebridge-solis-cloud-api/issues"
+  },
   "dependencies": {
     "node-fetch": "^2.7.0"
   },
