@@ -19,13 +19,10 @@ class SolisCloudAPI {
         this.deviceId = config.deviceId;
         this.baseUrl = config.baseUrl || "https://www.soliscloud.com:13333";
 
-        //
         // --- CUSTOM CHARACTERISTICS ---
-        //
-
         class PowerCharacteristic extends Characteristic {
             constructor() {
-                super("PV Power (kW)", "e2b6f0f1-1234-4a56-90ab-cdef12345601");
+                super("Current PV Power (kW)", "e2b6f0f1-1234-4a56-90ab-cdef12345601");
                 this.setProps({
                     format: Characteristic.Formats.FLOAT,
                     unit: "kW",
@@ -35,21 +32,9 @@ class SolisCloudAPI {
             }
         }
 
-        class DayEnergyCharacteristic extends Characteristic {
-            constructor() {
-                super("Day Energy (kWh)", "e2b6f0f2-1234-4a56-90ab-cdef12345602");
-                this.setProps({
-                    format: Characteristic.Formats.FLOAT,
-                    unit: "kWh",
-                    minValue: 0, maxValue: 100000, minStep: 0.01,
-                    perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY],
-                });
-            }
-        }
-
         class GridImportCharacteristic extends Characteristic {
             constructor() {
-                super("Grid Import (kW)", "e2b6f0f3-1234-4a56-90ab-cdef12345603");
+                super("Current Grid Import (kW)", "e2b6f0f3-1234-4a56-90ab-cdef12345603");
                 this.setProps({
                     format: Characteristic.Formats.FLOAT,
                     unit: "kW",
@@ -61,7 +46,7 @@ class SolisCloudAPI {
 
         class GridExportCharacteristic extends Characteristic {
             constructor() {
-                super("Grid Export (kW)", "e2b6f0f4-1234-4a56-90ab-cdef12345604");
+                super("Current Grid Export (kW)", "e2b6f0f4-1234-4a56-90ab-cdef12345604");
                 this.setProps({
                     format: Characteristic.Formats.FLOAT,
                     unit: "kW",
@@ -71,50 +56,24 @@ class SolisCloudAPI {
             }
         }
 
-        class NetGridFlowCharacteristic extends Characteristic {
-            constructor() {
-                super("Net Grid Flow (kW)", "e2b6f0f5-1234-4a56-90ab-cdef12345605");
-                this.setProps({
-                    format: Characteristic.Formats.FLOAT,
-                    unit: "kW",
-                    minValue: -10000, maxValue: 10000, minStep: 0.01,
-                    perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY],
-                });
-            }
-        }
-
         // Save for later
         this._PowerCharacteristic = PowerCharacteristic;
-        this._DayEnergyCharacteristic = DayEnergyCharacteristic;
         this._GridImportCharacteristic = GridImportCharacteristic;
         this._GridExportCharacteristic = GridExportCharacteristic;
-        this._NetGridFlowCharacteristic = NetGridFlowCharacteristic;
 
-        //
         // --- SERVICES ---
-        //
-
         this.powerSensor = new Service.LightSensor("PV Power", "pvPower");
         this.powerSensor.addCharacteristic(PowerCharacteristic);
 
-        this.dayEnergySensor = new Service.LightSensor("PV Day Energy", "pvDayEnergy");
-        this.dayEnergySensor.addCharacteristic(DayEnergyCharacteristic);
-
         this.batterySensor = new Service.BatteryService("Battery SOC", "batterySensor");
 
-        // NEW:
         this.gridImportSensor = new Service.LightSensor("Grid Import", "gridImport");
         this.gridImportSensor.addCharacteristic(GridImportCharacteristic);
 
         this.gridExportSensor = new Service.LightSensor("Grid Export", "gridExport");
         this.gridExportSensor.addCharacteristic(GridExportCharacteristic);
 
-        this.netGridFlowSensor = new Service.LightSensor("Net Grid Flow", "netGridFlow");
-        this.netGridFlowSensor.addCharacteristic(NetGridFlowCharacteristic);
-
-        //
         // Update intervals
-        //
         this.apiInterval = config.apiInterval || 300;
         this.sensorInterval = config.sensorInterval || 60;
         this.cache = {};
@@ -125,10 +84,7 @@ class SolisCloudAPI {
         setInterval(() => this.updateSensors(), this.sensorInterval * 1000);
     }
 
-    //
     // --- AUTH HELPERS ---
-    //
-
     md5Base64(str) {
         return crypto.createHash("md5").update(str, "utf8").digest("base64");
     }
@@ -165,10 +121,7 @@ class SolisCloudAPI {
         return res.json();
     }
 
-    //
     // --- DATA FETCH ---
-    //
-
     async updateData() {
         try {
             const response = await this.solisRequest("/v1/api/stationDetailList", {
@@ -183,12 +136,12 @@ class SolisCloudAPI {
             const r = response.data.records[0];
 
             this.cache = {
-                currentPvKw: r.power,
-                dayPvEnergyKwp: r.dayEnergy,
-                batteryPercent: r.batteryPercent,
-                netGridFlowKw: r.psum,
-                gridImportKw: r.psum < 0 ? Math.abs(r.psum) : 0,
-                gridExportKw: r.psum > 0 ? r.psum : 0,
+                currentPvKw: r.power, // PV Generation
+                batteryPercent: r.batteryPercent, // Battery %
+                batteryPower: r.batteryPower, // Battery charge (+) / discharge (-) rate
+                familyLoadPower: r.familyLoadPower, // Total Household use
+                gridImportKw: r.psum < 0 ? Math.abs(r.psum) : 0, // how much importing from grid
+                gridExportKw: r.psum > 0 ? r.psum : 0  // how much exporting to grid
             };
 
             this.updateSensors();
@@ -197,17 +150,11 @@ class SolisCloudAPI {
         }
     }
 
-    //
     // --- SENSOR UPDATE ---
-    //
-
     updateSensors() {
         try {
             if (this.cache.currentPvKw !== undefined)
                 this.powerSensor.getCharacteristic(this._PowerCharacteristic).updateValue(this.cache.currentPvKw);
-
-            if (this.cache.dayPvEnergyKwp !== undefined)
-                this.dayEnergySensor.getCharacteristic(this._DayEnergyCharacteristic).updateValue(this.cache.dayPvEnergyKwp);
 
             if (this.cache.batteryPercent !== undefined)
                 this.batterySensor.setCharacteristic(Characteristic.BatteryLevel, this.cache.batteryPercent);
@@ -220,10 +167,6 @@ class SolisCloudAPI {
             this.gridExportSensor
                 .getCharacteristic(this._GridExportCharacteristic)
                 .updateValue(this.cache.gridExportKw);
-
-            this.netGridFlowSensor
-                .getCharacteristic(this._NetGridFlowCharacteristic)
-                .updateValue(this.cache.netGridFlowKw);
 
         } catch (err) {
             this.log.error("Failed to update sensors:", err);
@@ -242,13 +185,9 @@ class SolisCloudAPI {
                 .setCharacteristic(Characteristic.SerialNumber, this.deviceId),
 
             this.powerSensor,
-            this.dayEnergySensor,
             this.batterySensor,
-
-            // New:
             this.gridImportSensor,
             this.gridExportSensor,
-            this.netGridFlowSensor
         ];
     }
 }
