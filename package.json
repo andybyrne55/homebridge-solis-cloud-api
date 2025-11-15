@@ -1,0 +1,19 @@
+{
+  "name": "homebridge-solis-cloud-api",
+  "version": "1.0.0",
+  "description": "Homebridge plugin for Solis inverter data",
+  "main": "index.js",
+  "keywords": [
+    "homebridge-plugin"
+  ],
+  "engines": {
+    "node": ">=18.0.0",
+    "homebridge": ">=1.4.0"
+  },
+  "dependencies": {
+    "node-fetch": "^2.7.0"
+  },
+  "homebridge": {
+    "compatibility": ">=1.6.0"
+  }
+}
