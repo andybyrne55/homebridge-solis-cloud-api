@@ -10,10 +10,16 @@
     "node": ">=18.0.0",
     "homebridge": ">=1.4.0"
   },
+  "author": "Andrew Byrne",
+  "license": "MIT",
   "dependencies": {
     "node-fetch": "^2.7.0"
   },
   "homebridge": {
-    "compatibility": ">=1.6.0"
+    "accessories": [
+      {
+        "accessory": "SolisCloudAPI"
+      }
+    ]
   }
 }
