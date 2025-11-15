@@ -19,80 +19,77 @@ class SolisCloudAPI {
         this.deviceId = config.deviceId;
         this.baseUrl = config.baseUrl || "https://www.soliscloud.com:13333";
 
-        // --- CUSTOM CHARACTERISTICS ---
-        class PowerCharacteristic extends Characteristic {
-            constructor() {
-                super("Current PV Power (kW)", "e2b6f0f1-1234-4a56-90ab-cdef12345601");
-                this.setProps({
-                    format: Characteristic.Formats.FLOAT,
-                    unit: "kW",
-                    minValue: 0, maxValue: 10000, minStep: 0.01,
-                    perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY],
-                });
-            }
-        }
-
-        class GridImportCharacteristic extends Characteristic {
-            constructor() {
-                super("Current Grid Import (kW)", "e2b6f0f3-1234-4a56-90ab-cdef12345603");
-                this.setProps({
-                    format: Characteristic.Formats.FLOAT,
-                    unit: "kW",
-                    minValue: 0, maxValue: 10000, minStep: 0.01,
-                    perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY],
-                });
-            }
-        }
-
-        class GridExportCharacteristic extends Characteristic {
-            constructor() {
-                super("Current Grid Export (kW)", "e2b6f0f4-1234-4a56-90ab-cdef12345604");
-                this.setProps({
-                    format: Characteristic.Formats.FLOAT,
-                    unit: "kW",
-                    minValue: 0, maxValue: 10000, minStep: 0.01,
-                    perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY],
-                });
-            }
-        }
-
-        // Save for later
-        this._PowerCharacteristic = PowerCharacteristic;
-        this._GridImportCharacteristic = GridImportCharacteristic;
-        this._GridExportCharacteristic = GridExportCharacteristic;
-
-        // --- SERVICES ---
-        this.powerSensor = new Service.LightSensor("PV Power", "pvPower");
-        this.powerSensor.addCharacteristic(PowerCharacteristic);
-
-        this.batterySensor = new Service.BatteryService("Battery SOC", "batterySensor");
-
-        this.gridImportSensor = new Service.LightSensor("Grid Import", "gridImport");
-        this.gridImportSensor.addCharacteristic(GridImportCharacteristic);
-
-        this.gridExportSensor = new Service.LightSensor("Grid Export", "gridExport");
-        this.gridExportSensor.addCharacteristic(GridExportCharacteristic);
-
-        // Update intervals
         this.apiInterval = config.apiInterval || 300;
         this.sensorInterval = config.sensorInterval || 60;
         this.cache = {};
 
-        // Start
+        // --- CUSTOM CHARACTERISTICS FOR ENERGY TOTALS ---
+        this._pvPowerCharacteristic = this.createNumericCharacteristic("PV Power (kW)", "e2b6f0f1-1234-4a56-90ab-cdef12345601", 0, 10000, 0.01, "kW");
+        this._batteryPowerCharacteristic = this.createNumericCharacteristic("Battery Power (kW)", "e2b6f0f2-1234-4a56-90ab-cdef12345602", -10000, 10000, 0.01, "kW");
+        this._houseLoadCharacteristic = this.createNumericCharacteristic("House Load (kW)", "e2b6f0f3-1234-4a56-90ab-cdef12345603", 0, 10000, 0.01, "kW");
+        this._gridImportCharacteristic = this.createNumericCharacteristic("Grid Import (kW)", "e2b6f0f4-1234-4a56-90ab-cdef12345604", 0, 10000, 0.01, "kW");
+        this._gridExportCharacteristic = this.createNumericCharacteristic("Grid Export (kW)", "e2b6f0f5-1234-4a56-90ab-cdef12345605", 0, 10000, 0.01, "kW");
+        this._batteryPercentCharacteristic = this.createNumericCharacteristic("Battery %", "e2b6f0f6-1234-4a56-90ab-cdef12345606", 0, 100, 1, "%");
+
+        this._dayEnergyCharacteristic = this.createNumericCharacteristic("PV Today Energy (kWh)", "e2b6f0f6-1234-4a56-90ab-cdef12345606", 0, 10000, 0.01, "kWh");
+        this._monthEnergyCharacteristic = this.createNumericCharacteristic("PV Month Energy (kWh)", "e2b6f0f7-1234-4a56-90ab-cdef12345607", 0, 100000, 0.01, "kWh");
+        this._yearEnergyCharacteristic = this.createNumericCharacteristic("PV Year Energy (kWh)", "e2b6f0f8-1234-4a56-90ab-cdef12345608", 0, 100000, 0.01, "kWh");
+        this._totalEnergyCharacteristic = this.createNumericCharacteristic("PV Total Energy (kWh)", "e2b6f0f9-1234-4a56-90ab-cdef12345609", 0, 1000000, 0.01, "kWh");
+
+        this._batteryDischargeEnergyCharacteristic = this.createNumericCharacteristic("Battery Discharge Today (kWh)", "e2b6f0fa-1234-4a56-90ab-cdef1234560a", 0, 10000, 0.01, "kWh");
+        this._batteryChargeEnergyCharacteristic = this.createNumericCharacteristic("Battery Charge Today (kWh)", "e2b6f0fb-1234-4a56-90ab-cdef1234560b", 0, 10000, 0.01, "kWh");
+
+        this._gridPurchasedEnergyCharacteristic = this.createNumericCharacteristic("Grid Purchased Today (kWh)", "e2b6f0fc-1234-4a56-90ab-cdef1234560c", 0, 10000, 0.01, "kWh");
+        this._gridSellEnergyCharacteristic = this.createNumericCharacteristic("Grid Sold Today (kWh)", "e2b6f0fd-1234-4a56-90ab-cdef1234560d", 0, 10000, 0.01, "kWh");
+
+        this._houseLoadEnergyCharacteristic = this.createNumericCharacteristic("House Load Today (kWh)", "e2b6f0fe-1234-4a56-90ab-cdef1234560e", 0, 10000, 0.01, "kWh");
+
+        // --- SINGLE ENERGY SERVICE ---
+        this.energyService = new Service.AccessoryInformation("Solis Energy", "solisEnergy");
+        this.energyService.addCharacteristic(this._pvPowerCharacteristic);
+        this.energyService.addCharacteristic(this._batteryPowerCharacteristic);
+        this.energyService.addCharacteristic(this._houseLoadCharacteristic);
+        this.energyService.addCharacteristic(this._gridImportCharacteristic);
+        this.energyService.addCharacteristic(this._gridExportCharacteristic);
+        this.energyService.addCharacteristic(this._batteryPercentCharacteristic);
+        this.energyService.addCharacteristic(this._dayEnergyCharacteristic);
+        this.energyService.addCharacteristic(this._monthEnergyCharacteristic);
+        this.energyService.addCharacteristic(this._yearEnergyCharacteristic);
+        this.energyService.addCharacteristic(this._totalEnergyCharacteristic);
+        this.energyService.addCharacteristic(this._batteryDischargeEnergyCharacteristic);
+        this.energyService.addCharacteristic(this._batteryChargeEnergyCharacteristic);
+        this.energyService.addCharacteristic(this._gridPurchasedEnergyCharacteristic);
+        this.energyService.addCharacteristic(this._gridSellEnergyCharacteristic);
+        this.energyService.addCharacteristic(this._houseLoadEnergyCharacteristic);
+
         this.updateData();
         setInterval(() => this.updateData(), this.apiInterval * 1000);
         setInterval(() => this.updateSensors(), this.sensorInterval * 1000);
     }
 
-    // --- AUTH HELPERS ---
+    createNumericCharacteristic(name, uuid, min, max, step, unit) {
+        class CustomCharacteristic extends Characteristic {
+            constructor() {
+                super(name, uuid);
+                this.setProps({
+                    format: Characteristic.Formats.FLOAT,
+                    unit,
+                    minValue: min,
+                    maxValue: max,
+                    minStep: step,
+                    perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY],
+                });
+            }
+        }
+        return CustomCharacteristic;
+    }
+
     md5Base64(str) {
         return crypto.createHash("md5").update(str, "utf8").digest("base64");
     }
 
     hmacSha1Base64(text, secret) {
-        return crypto.createHmac("sha1", Buffer.from(secret, "utf8"))
-            .update(text, "utf8")
-            .digest("base64");
+        return crypto.createHmac("sha1", Buffer.from(secret, "utf8")).update(text, "utf8").digest("base64");
     }
 
     getGMTTime() {
@@ -103,79 +100,102 @@ class SolisCloudAPI {
         const body = JSON.stringify(bodyObject);
         const contentMD5 = this.md5Base64(body);
         const date = this.getGMTTime();
-
         const signStr = `POST\n${contentMD5}\napplication/json\n${date}\n${path}`;
         const sign = this.hmacSha1Base64(signStr, this.apiSecret);
 
-        const res = await fetch(this.baseUrl + path, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json;charset=UTF-8",
-                "Authorization": `API ${this.apiKey}:${sign}`,
-                "Content-MD5": contentMD5,
-                "Date": date
-            },
-            body
-        });
+        this.log.debug(`[Solis API] Calling ${path} at ${date}`);
 
-        return res.json();
+        let response;
+        try {
+            response = await fetch(this.baseUrl + path, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json;charset=UTF-8",
+                    "Authorization": `API ${this.apiKey}:${sign}`,
+                    "Content-MD5": contentMD5,
+                    "Date": date
+                },
+                body,
+                timeout: 8000
+            });
+        } catch (err) {
+            this.log.error("[Solis API] Network/timeout error:", err.message);
+            throw err;
+        }
+
+        if (!response.ok) {
+            this.log.error(`[Solis API] HTTP ${response.status}: ${response.statusText}`);
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        return response.json();
     }
 
-    // --- DATA FETCH ---
     async updateData() {
+        this.log.debug("[Solis] updateData() start");
         try {
-            const response = await this.solisRequest("/v1/api/stationDetailList", {
-                deviceId: this.deviceId
-            });
-
-            if (!response.success) {
-                this.log.error("Failed to fetch Solis data", response);
+            const response = await this.solisRequest("/v1/api/stationDetailList", { deviceId: this.deviceId });
+            if (!response?.success || !response.data?.records?.length) {
+                this.log.error("Solis API returned no data:", response);
                 return;
             }
 
             const r = response.data.records[0];
+            const safe = n => (typeof n === "number" && !isNaN(n) ? n : 0);
 
             this.cache = {
-                currentPvKw: r.power, // PV Generation
-                batteryPercent: r.batteryPercent, // Battery %
-                batteryPower: r.batteryPower, // Battery charge (+) / discharge (-) rate
-                familyLoadPower: r.familyLoadPower, // Total Household use
-                gridImportKw: r.psum < 0 ? Math.abs(r.psum) : 0, // how much importing from grid
-                gridExportKw: r.psum > 0 ? r.psum : 0  // how much exporting to grid
+                pvPower: safe(r.power),
+                batteryPower: safe(r.batteryPower),
+                batteryPercent: safe(r.batteryPercent),
+                houseLoad: safe(r.familyLoadPower),
+                gridImport: r.psum < 0 ? Math.abs(safe(r.psum)) : 0,
+                gridExport: r.psum > 0 ? safe(r.psum) : 0,
+                dayEnergy: safe(r.dayEnergy),
+                monthEnergy: safe(r.monthEnergy),
+                yearEnergy: safe(r.yearEnergy),
+                totalEnergy: safe(r.allEnergy),
+                batteryDischarge: safe(r.batteryTodayDischargeEnergy),
+                batteryCharge: safe(r.batteryTodayChargeEnergy),
+                gridPurchased: safe(r.gridPurchasedDayEnergy),
+                gridSold: safe(r.gridSellDayEnergy),
+                houseLoadEnergy: safe(r.homeLoadTodayEnergy)
             };
 
+            this.log.info("[Solis] Cache updated:", this.cache);
             this.updateSensors();
         } catch (err) {
             this.log.error("Error updating Solis data:", err);
         }
     }
 
-    // --- SENSOR UPDATE ---
     updateSensors() {
         try {
-            if (this.cache.currentPvKw !== undefined)
-                this.powerSensor.getCharacteristic(this._PowerCharacteristic).updateValue(this.cache.currentPvKw);
+            const c = this.cache;
 
-            if (this.cache.batteryPercent !== undefined)
-                this.batterySensor.setCharacteristic(Characteristic.BatteryLevel, this.cache.batteryPercent);
+            this.energyService.getCharacteristic(this._pvPowerCharacteristic).updateValue(c.pvPower);
+            this.energyService.getCharacteristic(this._batteryPowerCharacteristic).updateValue(c.batteryPower);
+            this.energyService.getCharacteristic(this._houseLoadCharacteristic).updateValue(c.houseLoad);
+            this.energyService.getCharacteristic(this._gridImportCharacteristic).updateValue(c.gridImport);
+            this.energyService.getCharacteristic(this._gridExportCharacteristic).updateValue(c.gridExport);
+            this.energyService.getCharacteristic(this._batteryPercentCharacteristic).updateValue(c.batteryPercent);
 
-            // New grid values
-            this.gridImportSensor
-                .getCharacteristic(this._GridImportCharacteristic)
-                .updateValue(this.cache.gridImportKw);
+            this.energyService.getCharacteristic(this._dayEnergyCharacteristic).updateValue(c.dayEnergy);
+            this.energyService.getCharacteristic(this._monthEnergyCharacteristic).updateValue(c.monthEnergy);
+            this.energyService.getCharacteristic(this._yearEnergyCharacteristic).updateValue(c.yearEnergy);
+            this.energyService.getCharacteristic(this._totalEnergyCharacteristic).updateValue(c.totalEnergy);
 
-            this.gridExportSensor
-                .getCharacteristic(this._GridExportCharacteristic)
-                .updateValue(this.cache.gridExportKw);
+            this.energyService.getCharacteristic(this._batteryDischargeEnergyCharacteristic).updateValue(c.batteryDischarge);
+            this.energyService.getCharacteristic(this._batteryChargeEnergyCharacteristic).updateValue(c.batteryCharge);
+
+            this.energyService.getCharacteristic(this._gridPurchasedEnergyCharacteristic).updateValue(c.gridPurchased);
+            this.energyService.getCharacteristic(this._gridSellEnergyCharacteristic).updateValue(c.gridSold);
+
+            this.energyService.getCharacteristic(this._houseLoadEnergyCharacteristic).updateValue(c.houseLoadEnergy);
 
         } catch (err) {
             this.log.error("Failed to update sensors:", err);
         }
     }
-
-    //
-    // --- HOMEKIT SERVICE LIST ---
-    //
 
     getServices() {
         return [
@@ -183,11 +203,7 @@ class SolisCloudAPI {
                 .setCharacteristic(Characteristic.Manufacturer, "Solis")
                 .setCharacteristic(Characteristic.Model, "Inverter")
                 .setCharacteristic(Characteristic.SerialNumber, this.deviceId),
-
-            this.powerSensor,
-            this.batterySensor,
-            this.gridImportSensor,
-            this.gridExportSensor,
+            this.energyService
         ];
     }
 }
