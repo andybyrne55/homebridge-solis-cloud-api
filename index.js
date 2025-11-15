@@ -41,8 +41,9 @@ class SolisCloudAPI {
 
         this._dayHouseLoadEnergyCharacteristic = this.createNumericCharacteristic("House Load Today (kWh)", "e2b6f0fe-1234-4a56-90ab-cdef1234560e", 0, 10000, 0.01, "kWh");
 
-        // --- SINGLE ENERGY SERVICE ---
-        this.energyService = new Service.AccessoryInformation("Solis Energy", "solisEnergy");
+        // --- SINGLE ENERGY SERVICE (use a switch so we don't need a fake lux reading) ---
+        this.energyService = new Service.Switch("Solis Energy", "solisEnergy");
+
         this.energyService.addCharacteristic(this._pvPowerCharacteristic);
         this.energyService.addCharacteristic(this._batteryPowerCharacteristic);
         this.energyService.addCharacteristic(this._houseLoadCharacteristic);
