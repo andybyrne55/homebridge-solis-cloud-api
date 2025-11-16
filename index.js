@@ -24,6 +24,8 @@ class SolisCloudAPI {
         this.cache = {};
 
         // --- CUSTOM CHARACTERISTICS FOR ENERGY TOTALS ---
+        this._dataTimestampCharacteristic = this.createStringCharacteristic("Data Timestamp", "e2b6f0ff-1234-4a56-90ab-cdef123456ff");
+
         this._pvPowerCharacteristic = this.createNumericCharacteristic("PV Power (kW)", "e2b6f0f1-1234-4a56-90ab-cdef12345601", 0, 10000, 0.01, "kW");
         this._batteryPowerCharacteristic = this.createNumericCharacteristic("Battery Power (kW)", "e2b6f0f2-1234-4a56-90ab-cdef12345602", -10000, 10000, 0.01, "kW");
         this._batteryPercentCharacteristic = this.createNumericCharacteristic("Battery %", "e2b6f0f6-1234-4a56-90ab-cdef12345616", 0, 100, 1, "%");
@@ -41,9 +43,9 @@ class SolisCloudAPI {
 
         this._dayHouseLoadEnergyCharacteristic = this.createNumericCharacteristic("House Load Today (kWh)", "e2b6f0fe-1234-4a56-90ab-cdef1234560e", 0, 10000, 0.01, "kWh");
 
-        // --- SINGLE ENERGY SERVICE (use a switch so we don't need a fake lux reading) ---
-        this.energyService = new Service.Switch("Solis Energy", "solisEnergy");
-
+        // --- SINGLE ENERGY SERVICE (use a stateless programmable switch) ---
+        this.energyService = new Service.StatelessProgrammableSwitch("Solis Energy", "solisEnergy");
+        this.energyService.addCharacteristic(this._dataTimestampCharacteristic);
         this.energyService.addCharacteristic(this._pvPowerCharacteristic);
         this.energyService.addCharacteristic(this._batteryPowerCharacteristic);
         this.energyService.addCharacteristic(this._batteryPercentCharacteristic);
@@ -78,6 +80,19 @@ class SolisCloudAPI {
             }
         }
         return CustomCharacteristic;
+    }
+
+    createStringCharacteristic(name, uuid) {
+        class CustomStringCharacteristic extends Characteristic {
+            constructor() {
+                super(name, uuid);
+                this.setProps({
+                    format: Characteristic.Formats.STRING,
+                    perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY],
+                });
+            }
+        }
+        return CustomStringCharacteristic;
     }
 
     md5Base64(str) {
@@ -137,7 +152,8 @@ class SolisCloudAPI {
             }
 
             const r = response.data.records[0];
-            const safe = n => (typeof n === "number" && !isNaN(n) ? n : 0);
+
+            const safe = (n, fallback = 0) => (typeof n === "number" && !isNaN(n) ? n : Number(n) || fallback);
 
             this.cache = {
                 pvPower: safe(r.power),
@@ -152,7 +168,8 @@ class SolisCloudAPI {
                 totalPvEnergy: safe(r.allEnergy),
                 dayGridPurchased: safe(r.gridPurchasedDayEnergy),
                 dayGridSold: safe(r.gridSellDayEnergy),
-                dayHouseLoadEnergy: safe(r.homeLoadTodayEnergy)
+                dayHouseLoadEnergy: safe(r.homeLoadTodayEnergy),
+                dataTimestamp: new Date(safe(r.dataTimestamp, Date.now())).toLocaleString()
             };
 
             this.log.info("[Solis] Cache updated:", this.cache);
@@ -165,6 +182,8 @@ class SolisCloudAPI {
     updateSensors() {
         try {
             const c = this.cache;
+
+            this.energyService.getCharacteristic(this._dataTimestampCharacteristic).updateValue(c.dataTimestamp);
 
             this.energyService.getCharacteristic(this._pvPowerCharacteristic).updateValue(c.pvPower);
             this.energyService.getCharacteristic(this._batteryPowerCharacteristic).updateValue(c.batteryPower);
