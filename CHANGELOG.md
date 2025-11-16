@@ -1,0 +1,11 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+## [0.6.0] - 2025-11-16
+### Added
+- Initial Homebridge plugin release for Solis Cloud API.
+- Support for reading inverter device data (power, battery, grid usage).
+- Accessory registration via Homebridge.
+- Basic configuration via `config.json`.
+- Node.js 18+ and Homebridge 1.4+ compatibility.
