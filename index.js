@@ -7,25 +7,72 @@ let Service, Characteristic;
 module.exports = (homebridge) => {
     Service = homebridge.hap.Service;
     Characteristic = homebridge.hap.Characteristic;
-    homebridge.registerAccessory("homebridge-solis-cloud-api", "SolisCloudAPI", SolisCloudAPI);
+
+    homebridge.registerPlatform(
+        "homebridge-solis-cloud-api",
+        "SolisCloudAPI",
+        SolisCloudPlatform,
+        true
+    );
 };
 
-class SolisCloudAPI {
-    constructor(log, config) {
+class SolisCloudPlatform {
+    constructor(log, config, api) {
         this.log = log;
+        this.config = config || {};
+        this.api = api;
 
+        this.deviceId = this.config.deviceId;
+        if (!this.deviceId) {
+            this.log.error("Missing 'deviceId' in config");
+            return;
+        }
+
+        this.apiKey = this.config.apiKey;
+        this.apiSecret = this.config.apiSecret;
+        this.baseUrl = this.config.baseUrl || "https://www.soliscloud.com:13333";
+
+        this.apiInterval = this.config.apiInterval || 300; // seconds
+
+        this.accessory = null;
+
+        if (this.api) {
+            this.api.on("didFinishLaunching", () => {
+                this.log.info("[SolisCloudAPI] Homebridge launched. Initializing accessory...");
+                this.initAccessory();
+            });
+        }
+    }
+
+    initAccessory() {
+        const uuid = this.api.hap.uuid.generate(this.deviceId);
+        this.accessory = new this.api.platformAccessory(`Solis Energy ${this.deviceId}`, uuid);
+        this.accessory.context.deviceId = this.deviceId;
+
+        const solisAccessory = new SolisCloudAccessory(this.log, this.config, this.accessory);
+        this.accessory.services = solisAccessory.getServices();
+
+        this.api.registerPlatformAccessories("homebridge-solis-cloud-api", "SolisCloudAPI", [this.accessory]);
+
+        // Polling interval
+        setInterval(() => solisAccessory.updateData(), this.apiInterval * 1000);
+    }
+}
+
+// --- Accessory class ---
+class SolisCloudAccessory {
+    constructor(log, config, accessory) {
+        this.log = log;
+        this.accessory = accessory;
+        this.deviceId = config.deviceId;
         this.apiKey = config.apiKey;
         this.apiSecret = config.apiSecret;
-        this.deviceId = config.deviceId;
         this.baseUrl = config.baseUrl || "https://www.soliscloud.com:13333";
 
-        this.apiInterval = config.apiInterval || 300;
-        this.sensorInterval = config.sensorInterval || 60;
         this.cache = {};
 
-        // --- CUSTOM CHARACTERISTICS FOR ENERGY TOTALS ---
+        // CUSTOM CHARACTERISTICS
         this._dataTimestampCharacteristic = this.createStringCharacteristic("Data Timestamp", "e2b6f0ff-1234-4a56-90ab-cdef123456ff");
-
         this._pvPowerCharacteristic = this.createNumericCharacteristic("PV Power (kW)", "e2b6f0f1-1234-4a56-90ab-cdef12345601", 0, 10000, 0.01, "kW");
         this._batteryPowerCharacteristic = this.createNumericCharacteristic("Battery Power (kW)", "e2b6f0f2-1234-4a56-90ab-cdef12345602", -10000, 10000, 0.01, "kW");
         this._batteryPercentCharacteristic = this.createNumericCharacteristic("Battery %", "e2b6f0f6-1234-4a56-90ab-cdef12345616", 0, 100, 1, "%");
@@ -40,11 +87,10 @@ class SolisCloudAPI {
 
         this._dayGridPurchasedEnergyCharacteristic = this.createNumericCharacteristic("Grid Purchased Today (kWh)", "e2b6f0fc-1234-4a56-90ab-cdef1234560c", 0, 10000, 0.01, "kWh");
         this._dayGridSellEnergyCharacteristic = this.createNumericCharacteristic("Grid Sold Today (kWh)", "e2b6f0fd-1234-4a56-90ab-cdef1234560d", 0, 10000, 0.01, "kWh");
-
         this._dayHouseLoadEnergyCharacteristic = this.createNumericCharacteristic("House Load Today (kWh)", "e2b6f0fe-1234-4a56-90ab-cdef1234560e", 0, 10000, 0.01, "kWh");
 
-        // --- SINGLE ENERGY SERVICE (use a stateless programmable switch) ---
-        this.energyService = new Service.StatelessProgrammableSwitch("Solis Energy", "solisEnergy");
+        // ENERGY SERVICE
+        this.energyService = new Service.StatelessProgrammableSwitch(`Solis Energy ${this.deviceId}`, "solisEnergy");
         this.energyService.addCharacteristic(this._dataTimestampCharacteristic);
         this.energyService.addCharacteristic(this._pvPowerCharacteristic);
         this.energyService.addCharacteristic(this._batteryPowerCharacteristic);
@@ -60,9 +106,8 @@ class SolisCloudAPI {
         this.energyService.addCharacteristic(this._dayGridSellEnergyCharacteristic);
         this.energyService.addCharacteristic(this._dayHouseLoadEnergyCharacteristic);
 
+        // Initial data fetch
         this.updateData();
-        setInterval(() => this.updateData(), this.apiInterval * 1000);
-        setInterval(() => this.updateSensors(), this.sensorInterval * 1000);
     }
 
     createNumericCharacteristic(name, uuid, min, max, step, unit) {
@@ -95,64 +140,33 @@ class SolisCloudAPI {
         return CustomStringCharacteristic;
     }
 
-    md5Base64(str) {
-        return crypto.createHash("md5").update(str, "utf8").digest("base64");
-    }
-
-    hmacSha1Base64(text, secret) {
-        return crypto.createHmac("sha1", Buffer.from(secret, "utf8")).update(text, "utf8").digest("base64");
-    }
-
-    getGMTTime() {
-        return new Date().toUTCString();
-    }
-
     async solisRequest(path, bodyObject) {
         const body = JSON.stringify(bodyObject);
-        const contentMD5 = this.md5Base64(body);
-        const date = this.getGMTTime();
+        const contentMD5 = crypto.createHash("md5").update(body, "utf8").digest("base64");
+        const date = new Date().toUTCString();
         const signStr = `POST\n${contentMD5}\napplication/json\n${date}\n${path}`;
-        const sign = this.hmacSha1Base64(signStr, this.apiSecret);
+        const sign = crypto.createHmac("sha1", Buffer.from(this.apiSecret, "utf8")).update(signStr, "utf8").digest("base64");
 
-        this.log.debug(`[Solis API] Calling ${path} at ${date}`);
+        const response = await fetch(this.baseUrl + path, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json;charset=UTF-8",
+                "Authorization": `API ${this.apiKey}:${sign}`,
+                "Content-MD5": contentMD5,
+                "Date": date
+            },
+            body,
+            timeout: 8000
+        });
 
-        let response;
-        try {
-            response = await fetch(this.baseUrl + path, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json;charset=UTF-8",
-                    "Authorization": `API ${this.apiKey}:${sign}`,
-                    "Content-MD5": contentMD5,
-                    "Date": date
-                },
-                body,
-                timeout: 8000
-            });
-        } catch (err) {
-            this.log.error("[Solis API] Network/timeout error:", err.message);
-            throw err;
-        }
-
-        if (!response.ok) {
-            this.log.error(`[Solis API] HTTP ${response.status}: ${response.statusText}`);
-            throw new Error(`HTTP ${response.status}`);
-        }
-
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json();
     }
 
     async updateData() {
-        this.log.debug("[Solis] updateData() start");
         try {
             const response = await this.solisRequest("/v1/api/stationDetailList", { deviceId: this.deviceId });
-            if (!response?.success || !response.data?.records?.length) {
-                this.log.error("Solis API returned no data:", response);
-                return;
-            }
-
             const r = response.data.records[0];
-
             const safe = (n, fallback = 0) => (typeof n === "number" && !isNaN(n) ? n : Number(n) || fallback);
 
             this.cache = {
@@ -172,39 +186,28 @@ class SolisCloudAPI {
                 dataTimestamp: new Date(safe(r.dataTimestamp, Date.now())).toLocaleString()
             };
 
-            this.log.info("[Solis] Cache updated:", this.cache);
             this.updateSensors();
         } catch (err) {
-            this.log.error("Error updating Solis data:", err);
+            this.log.error("Failed to update Solis data:", err);
         }
     }
 
     updateSensors() {
-        try {
-            const c = this.cache;
-
-            this.energyService.getCharacteristic(this._dataTimestampCharacteristic).updateValue(c.dataTimestamp);
-
-            this.energyService.getCharacteristic(this._pvPowerCharacteristic).updateValue(c.pvPower);
-            this.energyService.getCharacteristic(this._batteryPowerCharacteristic).updateValue(c.batteryPower);
-            this.energyService.getCharacteristic(this._batteryPercentCharacteristic).updateValue(c.batteryPercent);
-            this.energyService.getCharacteristic(this._gridImportCharacteristic).updateValue(c.gridImport);
-            this.energyService.getCharacteristic(this._gridExportCharacteristic).updateValue(c.gridExport);
-            this.energyService.getCharacteristic(this._houseLoadCharacteristic).updateValue(c.houseLoad);
-
-            this.energyService.getCharacteristic(this._dayPvEnergyCharacteristic).updateValue(c.dayPvEnergy);
-            this.energyService.getCharacteristic(this._monthPvEnergyCharacteristic).updateValue(c.monthPvEnergy);
-            this.energyService.getCharacteristic(this._yearPvEnergyCharacteristic).updateValue(c.yearPvEnergy);
-            this.energyService.getCharacteristic(this._totalPvEnergyCharacteristic).updateValue(c.totalPvEnergy);
-
-            this.energyService.getCharacteristic(this._dayGridPurchasedEnergyCharacteristic).updateValue(c.dayGridPurchased);
-            this.energyService.getCharacteristic(this._dayGridSellEnergyCharacteristic).updateValue(c.dayGridSold);
-
-            this.energyService.getCharacteristic(this._dayHouseLoadEnergyCharacteristic).updateValue(c.dayHouseLoadEnergy);
-
-        } catch (err) {
-            this.log.error("Failed to update sensors:", err);
-        }
+        const c = this.cache;
+        this.energyService.getCharacteristic(this._dataTimestampCharacteristic).updateValue(c.dataTimestamp);
+        this.energyService.getCharacteristic(this._pvPowerCharacteristic).updateValue(c.pvPower);
+        this.energyService.getCharacteristic(this._batteryPowerCharacteristic).updateValue(c.batteryPower);
+        this.energyService.getCharacteristic(this._batteryPercentCharacteristic).updateValue(c.batteryPercent);
+        this.energyService.getCharacteristic(this._gridImportCharacteristic).updateValue(c.gridImport);
+        this.energyService.getCharacteristic(this._gridExportCharacteristic).updateValue(c.gridExport);
+        this.energyService.getCharacteristic(this._houseLoadCharacteristic).updateValue(c.houseLoad);
+        this.energyService.getCharacteristic(this._dayPvEnergyCharacteristic).updateValue(c.dayPvEnergy);
+        this.energyService.getCharacteristic(this._monthPvEnergyCharacteristic).updateValue(c.monthPvEnergy);
+        this.energyService.getCharacteristic(this._yearPvEnergyCharacteristic).updateValue(c.yearPvEnergy);
+        this.energyService.getCharacteristic(this._totalPvEnergyCharacteristic).updateValue(c.totalPvEnergy);
+        this.energyService.getCharacteristic(this._dayGridPurchasedEnergyCharacteristic).updateValue(c.dayGridPurchased);
+        this.energyService.getCharacteristic(this._dayGridSellEnergyCharacteristic).updateValue(c.dayGridSold);
+        this.energyService.getCharacteristic(this._dayHouseLoadEnergyCharacteristic).updateValue(c.dayHouseLoadEnergy);
     }
 
     getServices() {
