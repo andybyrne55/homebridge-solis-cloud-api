@@ -1,6 +1,6 @@
 {
   "name": "homebridge-solis-cloud-api",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Homebridge plugin for reading data from Solis Cloud API",
   "main": "index.js",
   "keywords": [
