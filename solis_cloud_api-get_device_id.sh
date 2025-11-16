@@ -94,7 +94,7 @@ for STATION_ID in "${STATION_IDS[@]}"; do
   SUCCESS_INVERTER=$(echo "$RESPONSE_INVERTER" | jq -r '.success // .code')
 
   if [[ "$SUCCESS_INVERTER" != "true" && "$SUCCESS_INVERTER" != "0" ]]; then
-    echo "❌ Failed to fetch devices for station id $STATION_ID:"
+    echo "❌ Failed to fetch devices for station id $STATION_ID"
     echo "$RESPONSE_INVERTER" | jq
     continue
   fi
@@ -106,7 +106,7 @@ for STATION_ID in "${STATION_IDS[@]}"; do
     continue
   fi
 
-  echo "✅ Found ${#IDS[@]} device(s) for station id $STATION_ID: ${IDS[*]}"
+  echo "✅ Found ${#IDS[@]} device(s) for station id $STATION_ID ${IDS[*]}"
   DEVICE_IDS+=("${IDS[@]}")
 done
 
@@ -135,13 +135,13 @@ for DEVICE_ID in "${DEVICE_IDS[@]}"; do
 
   SUCCESS_DETAIL=$(echo "$RESPONSE_DETAIL" | jq -r '.success')
   if [[ "$SUCCESS_DETAIL" != "true" ]]; then
-    echo "❌ Detail fetch failed for device id $DEVICE_ID:"
+    echo "❌ Detail fetch failed for device id $DEVICE_ID"
     echo "$RESPONSE_DETAIL" | jq
     continue
   fi
 
-  echo "✅ Detail fetched for device id $DEVICE_ID:"
+  echo "✅ Detail fetched for device id $DEVICE_ID"
   echo "$RESPONSE_DETAIL" | jq
 
-  echo "✅ Device id needed for homebridge config: $DEVICE_ID:"
+  echo "✅ Device id needed for homebridge config: $DEVICE_ID"
 done
