@@ -1,11 +1,11 @@
 {
   "name": "homebridge-solis-cloud-api",
-  "version": "1.0.2",
+  "version": "2.0.0",
   "description": "Homebridge plugin for reading data from Solis Cloud API for your inverter device",
   "main": "index.js",
   "keywords": [
     "homebridge-plugin",
-    "homebridge-accessory",
+    "homebridge-platform",
     "solis",
     "solar",
     "inverter",
@@ -29,9 +29,10 @@
     "node-fetch": "^2.7.0"
   },
   "homebridge": {
-    "accessories": [
+    "platforms": [
       {
-        "accessory": "SolisCloudAPI"
+        "platform": "SolisCloudAPI",
+        "name": "Solis Cloud API"
       }
     ]
   }
