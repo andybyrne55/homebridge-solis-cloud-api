@@ -2,7 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
-## 3.1.0 (2025-11-16)
+## 3.1.1 (2025-11-17)
+### Added
+- Adding more comments to code so I can remember what everything is about in 6 months!
+- Adding some more robust homebridge checks to support more versions
+
+## 3.1.0 (2025-11-17)
 ### Added
 - Adding pre-populated config
 
