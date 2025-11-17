@@ -148,19 +148,19 @@ class SolisCloudPlatform {
 
             // Prepare Data Map
             const dataMap = {
-                pvPower: safe(r.power),
-                batteryPower: safe(r.batteryPower),
-                batteryPercent: safe(r.batteryPercent),
-                gridImport: r.psum < 0 ? Math.abs(safe(r.psum)) : 0,
-                gridExport: r.psum > 0 ? safe(r.psum) : 0,
-                houseLoad: safe(r.familyLoadPower ?? r.loadPower ?? 0),
-                dayPvEnergy: safe(r.dayEnergy),
-                monthPvEnergy: safe(r.monthEnergy),
-                yearPvEnergy: safe(r.yearEnergy),
-                totalPvEnergy: safe(r.allEnergy),
-                dayGridPurchased: safe(r.gridPurchasedDayEnergy),
-                dayGridSold: safe(r.gridSellDayEnergy),
-                dayHouseLoadEnergy: safe(r.homeLoadTodayEnergy)
+                pvPower: safe(r.power), // e.g. 0.000
+                batteryPower: safe(r.batteryPower), // e.g. 0.000
+                batteryPercent: safe(r.batteryPercent), // e.g. 18.0
+                gridImport: r.psum < 0 ? Math.abs(safe(r.psum)) : 0, // e.g. -0.380
+                gridExport: r.psum > 0 ? safe(r.psum) : 0, // e.g. -0.380
+                houseLoad: safe(r.familyLoadPower), // e.g. 0.380
+                dayPvEnergy: safe(r.dayEnergy), // e.g. 5.200
+                monthPvEnergy: safe(r.monthEnergy), // e.g. 112.500
+                yearPvEnergy: safe(r.yearEnergy), // e.g. 216.100
+                totalPvEnergy: safe(r.allEnergy), // e.g. 216.100
+                dayGridPurchased: safe(r.gridPurchasedDayEnergy), // e.g. 14.290
+                dayGridSold: safe(r.gridSellDayEnergy), // e.g. 0.070
+                dayHouseLoadEnergy: safe(r.homeLoadTodayEnergy) // e.g. 19.420
             };
 
             const timestamp = new Date(safe(r.dataTimestamp, Date.now())).toLocaleString();
