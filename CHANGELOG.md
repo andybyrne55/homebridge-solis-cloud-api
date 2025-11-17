@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 3.1.0 (2025-11-16)
+### Added
+- Adding pre-populated config
+
 ## 3.0.0 (2025-11-16)
 ### Added
 - Moving to separate, real homekit sensors so automations are supported
