@@ -33,19 +33,16 @@
       {
         "platform": "SolisCloudAPI",
         "name": "Solis Cloud API",
-        "schema": {
-          "type": "object",
-          "properties": {
-            "apiKey": { "type": "string", "title": "API Key" },
-            "apiSecret": { "type": "string", "title": "API Secret" },
-            "deviceId": { "type": "string", "title": "Device ID" },
-            "apiInterval": { "type": "number", "title": "API Poll Interval (s)", "default": 300 },
-            "room": { "type": "string", "title": "Room Name", "default": "Solar Dashboard" }
-          },
-          "required": ["apiKey", "apiSecret", "deviceId"]
-        }
+        "type": "object",
+        "properties": {
+          "apiKey": { "type": "string", "title": "API Key" },
+          "apiSecret": { "type": "string", "title": "API Secret" },
+          "deviceId": { "type": "string", "title": "Device ID" },
+          "apiInterval": { "type": "number", "title": "API Poll Interval (s)", "default": 300 },
+          "room": { "type": "string", "title": "Room Name", "default": "Solar Dashboard" }
+        },
+        "required": ["apiKey", "apiSecret", "deviceId"]
       }
     ]
   }
-
 }

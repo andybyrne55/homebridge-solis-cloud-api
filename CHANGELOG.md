@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 3.1.3 (2025-11-17)
+### Added
+- Fixing schema
+- 
 ## 3.1.2 (2025-11-17)
 ### Added
 - Versions not updating correctly. Sorted now
