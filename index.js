@@ -3,25 +3,36 @@ const fetch = require("node-fetch");
 
 let Service, Characteristic;
 
+// -----------------------------------------------------------------------------
+// PLATFORM REGISTRATION (REQUIRED BY HOMEBRIDGE)
+// -----------------------------------------------------------------------------
+// Homebridge calls this once during plugin load. You *must*:
+// - Extract HAP Service and Characteristic
+// - Register the platform class
+// -----------------------------------------------------------------------------
 module.exports = (homebridge) => {
     Service = homebridge.hap.Service;
     Characteristic = homebridge.hap.Characteristic;
 
-    homebridge.registerPlatform(
-        "homebridge-solis-cloud-api",
-        "SolisCloudAPI",
-        SolisCloudPlatform,
-        true
-    );
+    homebridge.registerPlatform("homebridge-solis-cloud-api", "SolisCloudAPI", SolisCloudPlatform, true);
 };
 
+// -----------------------------------------------------------------------------
+// PLATFORM CLASS (Homebridge constructs this)
+// -----------------------------------------------------------------------------
 class SolisCloudPlatform {
+
+    // -------------------------------------------------------------------------
+    // REQUIRED BY HOMEBRIDGE.
+    // Homebridge creates your platform instance with logging, config, and API.
+    // You MUST store these and prepare for accessory loading.
+    // -------------------------------------------------------------------------
     constructor(log, config, api) {
         this.log = log;
         this.config = config || {};
         this.api = api;
 
-        // Configuration
+        // --- USER CONFIGURATION ---
         this.apiKey = this.config.apiKey;
         this.apiSecret = this.config.apiSecret;
         this.deviceId = this.config.deviceId;
@@ -56,29 +67,40 @@ class SolisCloudPlatform {
         }
 
         this.api.on("didFinishLaunching", () => {
-            this.log.info(`[Solis] Platform launched — initializing accessories`);
-            this.initAccessories();
-            this.startPolling();
+            this.log.info(`[Solis] Platform launched — initializing accessories...`);
+
+            this.initialiseAccessories();
+            this.startPollingLoop();
         });
     }
 
+    // -------------------------------------------------------------------------
+    // REQUIRED BY HOMEBRIDGE.
+    // Called once for every cached accessory restored from disk.
+    // You MUST store the accessory for later retrieval.
+    // -------------------------------------------------------------------------
     configureAccessory(accessory) {
         this.accessories.set(accessory.UUID, accessory);
     }
 
-    initAccessories() {
-        // 1. Create or Restore accessories for all metrics
+    // -------------------------------------------------------------------------
+    // Dynamic platforms must:
+    //   - Create new accessories if missing
+    //   - Restore existing accessories
+    //   - Remove accessories no longer needed
+    // -------------------------------------------------------------------------
+    initialiseAccessories() {
+        const validUUIDs = [];
+
         for (const metric of this.metrics) {
-            this.createOrRestoreAccessory(metric.name, metric.idTag);
+            const uuid = this.api.hap.uuid.generate(`solis-${this.deviceId}-${metric.idTag}`);
+            validUUIDs.push(uuid);
+            this.ensureAccessory(metric.name, metric.idTag, uuid);
         }
 
-        // 2. Cleanup: Remove accessories that are no longer in our metrics list
-        const activeUUIDs = this.metrics.map(m =>
-            this.api.hap.uuid.generate(`solis-${this.deviceId}-${m.idTag}`)
-        );
-
+        // Remove accessories that do not belong to current metrics
         for (const [uuid, accessory] of this.accessories) {
-            if (!activeUUIDs.includes(uuid)) {
+            if (!validUUIDs.includes(uuid)) {
                 this.log.warn(`[Solis] Removing obsolete accessory: ${accessory.displayName}`);
                 this.api.unregisterPlatformAccessories("homebridge-solis-cloud-api", "SolisCloudAPI", [accessory]);
                 this.accessories.delete(uuid);
@@ -86,12 +108,14 @@ class SolisCloudPlatform {
         }
     }
 
-    createOrRestoreAccessory(name, idTag) {
-        const uuid = this.api.hap.uuid.generate(`solis-${this.deviceId}-${idTag}`);
+    // -------------------------------------------------------------------------
+    // Creates or restores a LightSensor accessory for a metric.
+    // -------------------------------------------------------------------------
+    ensureAccessory(name, idTag, uuid) {
         let accessory = this.accessories.get(uuid);
 
         if (!accessory) {
-            // Create new
+            // Create new accessory
             accessory = new this.api.platformAccessory(name, uuid);
 
             // Info Service
@@ -108,15 +132,13 @@ class SolisCloudPlatform {
             this.api.registerPlatformAccessories("homebridge-solis-cloud-api", "SolisCloudAPI", [accessory]);
             this.log.info(`[Solis] Created accessory: ${name}`);
         } else {
-            // Ensure name is up to date
+            // Restore accessory and ensure correct service
             accessory.displayName = name;
-
-            // Ensure the service exists
             const service = this.getServiceBySubtype(accessory, Service.LightSensor, idTag);
             if (!service) {
                 this.log.warn(`[Solis] Fixing service type for ${name}`);
                 // Remove old services if any exist
-                accessory.services.forEach(s => {
+                accessory.getServices()(s => {
                     if (s.UUID !== Service.AccessoryInformation.UUID) {
                         accessory.removeService(s);
                     }
@@ -128,18 +150,23 @@ class SolisCloudPlatform {
         this.accessories.set(uuid, accessory);
     }
 
-    startPolling() {
+    // -------------------------------------------------------------------------
+    // Custom logic: periodically fetch API data and update sensors.
+    // -------------------------------------------------------------------------
+    startPollingLoop() {
         this.updateAllSensors();
         setInterval(() => this.updateAllSensors(), this.apiInterval * 1000);
     }
 
+    // -------------------------------------------------------------------------
+    // Fetches Solis API data and updates all LightSensor services.
+    // -------------------------------------------------------------------------
     async updateAllSensors() {
         try {
             const response = await this.solisRequest("/v1/api/stationDetailList", { deviceId: this.deviceId });
 
-            // Check for logical success as well as API success
             if (!response?.success || response.code !== '0' || !response.data?.records?.length) {
-                this.log.warn("[Solis] No valid data returned from API", response?.msg || "");
+                this.log.warn("[Solis] Invalid data returned from API", response?.msg || "");
                 return;
             }
 
@@ -180,6 +207,9 @@ class SolisCloudPlatform {
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Pushes the value into the appropriate HomeKit service.
+    //--------------------------------------------------------------------------
     updateLightSensor(idTag, value) {
         const uuid = this.api.hap.uuid.generate(`solis-${this.deviceId}-${idTag}`);
         const accessory = this.accessories.get(uuid);
@@ -188,13 +218,13 @@ class SolisCloudPlatform {
         const service = this.getServiceBySubtype(accessory, Service.LightSensor, idTag);
         if (!service) return;
 
-        // LightSensor cannot be 0 in HomeKit logic usually, min is 0.0001
-        const safeValue = Math.max(0.0001, Number(value));
-
+        const safeValue = Math.max(0.0001, Number(value)); // HomeKit min value
         this.safeUpdate(service, Characteristic.CurrentAmbientLightLevel, safeValue);
     }
 
-    // --- Helpers ---
+    // -------------------------------------------------------------------------
+    // Helper for retrieving services.
+    //--------------------------------------------------------------------------
     getServiceBySubtype(accessory, serviceType, subtype) {
         if (accessory.getServiceById) {
             return accessory.getServiceById(serviceType, subtype);
@@ -203,6 +233,9 @@ class SolisCloudPlatform {
             || accessory.getService(serviceType);
     }
 
+    // -------------------------------------------------------------------------
+    // Ensures characteristics update only when value changed.
+    //--------------------------------------------------------------------------
     safeUpdate(service, charType, value) {
         let characteristic = service.getCharacteristic(charType);
         if (!characteristic) {
@@ -213,6 +246,9 @@ class SolisCloudPlatform {
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Handles the Solis API authenticated POST request.
+    //--------------------------------------------------------------------------
     async solisRequest(path, bodyObject) {
         const body = JSON.stringify(bodyObject);
         const contentMD5 = crypto.createHash("md5").update(body, "utf8").digest("base64");
