@@ -30,51 +30,29 @@ class SolisCloudPlatform {
         this.deviceId = this.config.deviceId;
         this.baseUrl = this.config.baseUrl || "https://www.soliscloud.com:13333";
         this.apiInterval = this.config.apiInterval || 300; // seconds
-        this.sensorInterval = this.config.sensorInterval || 60; // (unused; kept if you want separate)
 
         this.accessories = new Map(); // UUID -> accessory
-        this.cache = {};
 
         if (!this.apiKey || !this.apiSecret || !this.deviceId) {
             this.log.error("Missing required config: apiKey, apiSecret, deviceId");
             return;
         }
 
-        // Allow Homebridge to restore cached accessories
         this.api.on("didFinishLaunching", () => {
-            this.log.info("[Solis] Platform launched — initialising accessories");
+            this.log.info("[Solis] Platform launched — initializing accessories");
             this.initAccessories();
             this.startPolling();
         });
     }
 
-    // Called by Homebridge for cached accessories
     configureAccessory(accessory) {
         this.log.debug(`[Solis] configureAccessory: ${accessory.displayName} (${accessory.UUID})`);
         this.accessories.set(accessory.UUID, accessory);
     }
 
     //
-    // --- CUSTOM CHARACTERISTIC FACTORIES ---
+    // --- CUSTOM CHARACTERISTIC FACTORY (string) ---
     //
-    createNumericCharacteristic(name, uuid, min = 0, max = 1000000, step = 0.01, unit = null) {
-        const CharClass = class extends Characteristic {
-            constructor() {
-                super(name, uuid);
-                const props = {
-                    format: Characteristic.Formats.FLOAT,
-                    perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY],
-                };
-                if (unit) props.unit = unit;
-                props.minValue = min;
-                props.maxValue = max;
-                props.minStep = step;
-                this.setProps(props);
-            }
-        };
-        return CharClass;
-    }
-
     createStringCharacteristic(name, uuid) {
         const CharClass = class extends Characteristic {
             constructor() {
@@ -89,16 +67,59 @@ class SolisCloudPlatform {
     }
 
     //
-    // Helper to create or restore an accessory and ensure names are set
+    // --- CREATE ACCESSORIES ---
     //
-    createOrRestoreAccessory({ name, idTag, serviceType, primaryCharacteristic, customCharacteristicClass = null }) {
+    initAccessories() {
+        // List of numeric metrics as separate LightSensor accessories
+        const lightSensorMetrics = [
+            { name: "PV Power kW", idTag: "pvPower" },
+            { name: "Battery Power kW", idTag: "batteryPower" },
+            { name: "Grid Import kW", idTag: "gridImport" },
+            { name: "Grid Export kW", idTag: "gridExport" },
+            { name: "House Load kW", idTag: "houseLoad" },
+            { name: "PV Today Energy kWh", idTag: "dayPvEnergy" },
+            { name: "PV Month Energy kWh", idTag: "monthPvEnergy" },
+            { name: "PV Year Energy kWh", idTag: "yearPvEnergy" },
+            { name: "PV Total Energy kWh", idTag: "totalPvEnergy" },
+            { name: "Grid Purchased Today kWh", idTag: "dayGridPurchased" },
+            { name: "Grid Sold Today kWh", idTag: "dayGridSold" },
+            { name: "House Load Today kWh", idTag: "dayHouseLoadEnergy" }
+        ];
+
+        for (const metric of lightSensorMetrics) {
+            this.createOrRestoreAccessory({
+                name: metric.name,
+                idTag: metric.idTag,
+                serviceType: Service.LightSensor
+            });
+        }
+
+        // Battery %
+        this.createOrRestoreAccessory({
+            name: "Battery Percentage",
+            idTag: "batteryPercent",
+            serviceType: Service.BatteryService
+        });
+
+        // Data Timestamp
+        const dataTsCharUUID = "e2b6f0ff-1234-4a56-90ab-cdef123456ff";
+        const DataTsChar = this.createStringCharacteristic("Data Timestamp", dataTsCharUUID);
+        this.createOrRestoreAccessory({
+            name: "Solis Data Timestamp",
+            idTag: "dataTimestamp",
+            serviceType: Service.StatelessProgrammableSwitch,
+            customCharacteristicClass: DataTsChar
+        });
+    }
+
+    createOrRestoreAccessory({ name, idTag, serviceType, customCharacteristicClass = null }) {
         const uuid = this.api.hap.uuid.generate(`solis-${this.deviceId}-${idTag}`);
         let accessory = this.accessories.get(uuid);
 
         if (!accessory) {
             accessory = new this.api.platformAccessory(name, uuid);
 
-            // AccessoryInformation -> Name
+            // AccessoryInformation
             accessory.getService(Service.AccessoryInformation)
                 .setCharacteristic(Characteristic.Name, name)
                 .setCharacteristic(Characteristic.Manufacturer, "Solis")
@@ -110,17 +131,14 @@ class SolisCloudPlatform {
             service.setCharacteristic(Characteristic.Name, name);
 
             if (customCharacteristicClass) {
-                // add custom characteristic to the service (e.g. string timestamp)
                 service.addCharacteristic(customCharacteristicClass);
             }
 
-            // register with homebridge so it's visible and cached
             this.api.registerPlatformAccessories("homebridge-solis-cloud-api", "SolisCloudAPI", [accessory]);
             this.log.info(`[Solis] Created accessory: ${name}`);
         } else {
-            // Ensure names are set on restored accessory (in case previous cache lacked them)
             accessory.displayName = name;
-            const svc = accessory.getService(serviceType) || accessory.getServiceById(serviceType, idTag);
+            const svc = accessory.getServiceById(serviceType, idTag);
             if (svc) svc.setCharacteristic(Characteristic.Name, name);
         }
 
@@ -129,50 +147,13 @@ class SolisCloudPlatform {
     }
 
     //
-    // Create every accessory you need (names + service types)
-    //
-    initAccessories() {
-        // Power metrics (kW) - expose as LightSensor (numeric)
-        this.createOrRestoreAccessory({ name: "PV Power", idTag: "pvPower", serviceType: Service.LightSensor });
-        this.createOrRestoreAccessory({ name: "Battery Power", idTag: "batteryPower", serviceType: Service.LightSensor });
-        this.createOrRestoreAccessory({ name: "Grid Import", idTag: "gridImport", serviceType: Service.LightSensor });
-        this.createOrRestoreAccessory({ name: "Grid Export", idTag: "gridExport", serviceType: Service.LightSensor });
-        this.createOrRestoreAccessory({ name: "House Load", idTag: "houseLoad", serviceType: Service.LightSensor });
-
-        // Energy totals (kWh) — also expose as numeric LightSensor (HomeKit lacks a native energy sensor)
-        this.createOrRestoreAccessory({ name: "PV Today Energy", idTag: "dayPvEnergy", serviceType: Service.LightSensor });
-        this.createOrRestoreAccessory({ name: "PV Month Energy", idTag: "monthPvEnergy", serviceType: Service.LightSensor });
-        this.createOrRestoreAccessory({ name: "PV Year Energy", idTag: "yearPvEnergy", serviceType: Service.LightSensor });
-        this.createOrRestoreAccessory({ name: "PV Total Energy", idTag: "totalPvEnergy", serviceType: Service.LightSensor });
-
-        this.createOrRestoreAccessory({ name: "Grid Purchased Today", idTag: "dayGridPurchased", serviceType: Service.LightSensor });
-        this.createOrRestoreAccessory({ name: "Grid Sold Today", idTag: "dayGridSold", serviceType: Service.LightSensor });
-        this.createOrRestoreAccessory({ name: "House Load Today", idTag: "dayHouseLoadEnergy", serviceType: Service.LightSensor });
-
-        // Battery percentage — use BatteryService (proper HomeKit battery UI)
-        this.createOrRestoreAccessory({ name: "Battery Level", idTag: "batteryPercent", serviceType: Service.BatteryService });
-
-        // Data timestamp — small stateless switch service with custom string char
-        const dataTsCharClass = this.createStringCharacteristic("Data Timestamp", "e2b6f0ff-1234-4a56-90ab-cdef123456ff");
-        this.createOrRestoreAccessory({
-            name: "Solis Data Timestamp",
-            idTag: "dataTimestamp",
-            serviceType: Service.StatelessProgrammableSwitch,
-            customCharacteristicClass: dataTsCharClass
-        });
-    }
-
-    //
     // Polling
     //
     startPolling() {
-        this.updateAllSensors(); // initial
+        this.updateAllSensors();
         setInterval(() => this.updateAllSensors(), this.apiInterval * 1000);
     }
 
-    //
-    // Build and sign API request, call Solis
-    //
     async solisRequest(path, bodyObject) {
         const body = JSON.stringify(bodyObject);
         const contentMD5 = crypto.createHash("md5").update(body, "utf8").digest("base64");
@@ -200,14 +181,11 @@ class SolisCloudPlatform {
 
             return res.json();
         } catch (err) {
-            this.log.error("[Solis] Request failed:", err.message);
+            this.log.error("[Solis] Request failed:", err.message || err);
             throw err;
         }
     }
 
-    //
-    // Central update — fetch once and update all accessories
-    //
     async updateAllSensors() {
         try {
             const response = await this.solisRequest("/v1/api/stationDetailList", { deviceId: this.deviceId });
@@ -218,11 +196,9 @@ class SolisCloudPlatform {
             }
 
             const r = response.data.records[0];
-
             const safe = (n, fallback = 0) => (typeof n === "number" && !isNaN(n) ? n : Number(n) || fallback);
 
-            // build cache with all metrics present previously
-            this.cache = {
+            const cache = {
                 pvPower: safe(r.power),
                 batteryPower: safe(r.batteryPower),
                 batteryPercent: safe(r.batteryPercent),
@@ -242,82 +218,68 @@ class SolisCloudPlatform {
                 dataTimestamp: new Date(safe(r.dataTimestamp, Date.now())).toLocaleString()
             };
 
-            // update each sensor/service
-            this.setLightSensorValue("pvPower", this.cache.pvPower);
-            this.setLightSensorValue("batteryPower", this.cache.batteryPower);
-            this.setLightSensorValue("gridImport", this.cache.gridImport);
-            this.setLightSensorValue("gridExport", this.cache.gridExport);
-            this.setLightSensorValue("houseLoad", this.cache.houseLoad);
+            // Update all numeric metrics
+            Object.entries(cache).forEach(([idTag, value]) => {
+                if (idTag === "batteryPercent") {
+                    this.updateBattery(idTag, value);
+                } else if (idTag === "dataTimestamp") {
+                    this.updateDataTimestamp(idTag, value);
+                } else {
+                    this.updateLightSensor(idTag, value);
+                }
+            });
 
-            this.setLightSensorValue("dayPvEnergy", this.cache.dayPvEnergy);
-            this.setLightSensorValue("monthPvEnergy", this.cache.monthPvEnergy);
-            this.setLightSensorValue("yearPvEnergy", this.cache.yearPvEnergy);
-            this.setLightSensorValue("totalPvEnergy", this.cache.totalPvEnergy);
-
-            this.setLightSensorValue("dayGridPurchased", this.cache.dayGridPurchased);
-            this.setLightSensorValue("dayGridSold", this.cache.dayGridSold);
-            this.setLightSensorValue("dayHouseLoadEnergy", this.cache.dayHouseLoadEnergy);
-
-            this.setBatteryLevel("batteryPercent", this.cache.batteryPercent);
-
-            this.setDataTimestamp("dataTimestamp", this.cache.dataTimestamp);
-
-            this.log.debug("[Solis] Sensors updated:", this.cache);
+            this.log.debug("[Solis] Sensors updated:", cache);
         } catch (err) {
             this.log.error("[Solis] updateAllSensors failed:", err.message || err);
         }
     }
 
-    //
-    // Helpers to set specific service characteristics
-    //
-    setLightSensorValue(idTag, value) {
+    updateLightSensor(idTag, value) {
         const uuid = this.api.hap.uuid.generate(`solis-${this.deviceId}-${idTag}`);
         const accessory = this.accessories.get(uuid);
         if (!accessory) return;
 
-        // HomeKit's CurrentAmbientLightLevel must be > 0; use tiny value for 0
-        const safeValue = (typeof value === "number" && value === 0) ? 0.0001 : value;
         const service = accessory.getService(Service.LightSensor);
         if (!service) return;
 
+        const safeValue = (typeof value === "number" && value === 0) ? 0.0001 : value;
         service.updateCharacteristic(Characteristic.CurrentAmbientLightLevel, safeValue);
     }
 
-    setBatteryLevel(idTag, value) {
+    updateBattery(idTag, value) {
         const uuid = this.api.hap.uuid.generate(`solis-${this.deviceId}-${idTag}`);
         const accessory = this.accessories.get(uuid);
         if (!accessory) return;
 
-        const safeValue = Math.max(0, Math.min(100, Number(value) || 0));
         const service = accessory.getService(Service.BatteryService);
         if (!service) return;
 
+        const safeValue = Math.max(0, Math.min(100, Number(value) || 0));
         service.updateCharacteristic(Characteristic.BatteryLevel, safeValue);
-        // Optionally update ChargingState / StatusLowBattery if you have logic
         const isLow = safeValue < 20;
         service.updateCharacteristic(Characteristic.StatusLowBattery, isLow ? Characteristic.StatusLowBattery.BATTERY_LEVEL_LOW : Characteristic.StatusLowBattery.BATTERY_LEVEL_NORMAL);
     }
 
-    setDataTimestamp(idTag, str) {
+    updateDataTimestamp(idTag, str) {
         const uuid = this.api.hap.uuid.generate(`solis-${this.deviceId}-${idTag}`);
         const accessory = this.accessories.get(uuid);
         if (!accessory) return;
 
-        // Find the stateless switch service and its custom string char (if present)
+        // write to stateless switch
         const service = accessory.getService(Service.StatelessProgrammableSwitch);
         if (!service) return;
 
-        // Attempt to find the custom char by uuid; if not present, fallback to EventCharacteristic
-        // We saved the custom string char in the service when creating the accessory.
         const chars = service.characteristics || [];
         const strChar = chars.find(c => String(c.UUID).toLowerCase().startsWith("e2b6f0ff"));
         if (strChar) {
             service.updateCharacteristic(strChar.UUID, str);
-        } else {
-            // fallback: update Programmable Switch Event as a string-ish notification (not ideal)
-            // Use the default notify characteristic with timestamp as integer (ms)
-            service.updateCharacteristic(Characteristic.ProgrammableSwitchEvent, Date.now());
+        }
+
+        // also update FirmwareRevision for visibility in Home app details
+        const ai = accessory.getService(Service.AccessoryInformation);
+        if (ai) {
+            try { ai.setCharacteristic(Characteristic.FirmwareRevision, str); } catch (e) {}
         }
     }
 }
