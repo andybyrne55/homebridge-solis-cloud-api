@@ -134,13 +134,14 @@ class SolisCloudPlatform {
         } else {
             // Restore accessory and ensure correct service
             accessory.displayName = name;
+
             const service = this.getServiceBySubtype(accessory, Service.LightSensor, idTag);
             if (!service) {
                 this.log.warn(`[Solis] Fixing service type for ${name}`);
-                // Remove old services if any exist
-                accessory.getServices()(s => {
+                // Remove old services if any exist (keep AccessoryInformation)
+                accessory.getServices().forEach(s => {
                     if (s.UUID !== Service.AccessoryInformation.UUID) {
-                        accessory.removeService(s);
+                        try { accessory.removeService(s); } catch (e) { /* ignore */ }
                     }
                 });
                 accessory.addService(Service.LightSensor, name, idTag);
@@ -154,7 +155,7 @@ class SolisCloudPlatform {
     // Custom logic: periodically fetch API data and update sensors.
     // -------------------------------------------------------------------------
     startPollingLoop() {
-        this.updateAllSensors();
+        this.updateAllSensors(); // Run once immediately, then on interval
         setInterval(() => this.updateAllSensors(), this.apiInterval * 1000);
     }
 
@@ -200,7 +201,7 @@ class SolisCloudPlatform {
                 }
             }
 
-            this.log.debug(`[Solis] Updated sensors. Timestamp: ${timestamp}. Details ${dataMap}`);
+            this.log.debug(`[Solis] Updated sensors. Timestamp: ${timestamp}. Details ${JSON.stringify(dataMap)}`);
 
         } catch (err) {
             this.log.error("[Solis] updateAllSensors failed:", err.message || err);
@@ -209,7 +210,7 @@ class SolisCloudPlatform {
 
     // -------------------------------------------------------------------------
     // Pushes the value into the appropriate HomeKit service.
-    //--------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     updateLightSensor(idTag, value) {
         const uuid = this.api.hap.uuid.generate(`solis-${this.deviceId}-${idTag}`);
         const accessory = this.accessories.get(uuid);
@@ -218,19 +219,39 @@ class SolisCloudPlatform {
         const service = this.getServiceBySubtype(accessory, Service.LightSensor, idTag);
         if (!service) return;
 
-        const safeValue = Math.max(0.0001, Number(value)); // HomeKit min value
+        // Parse number safely
+        const parsed = isFinite(Number(value)) ? Number(value) : NaN;
+        const fallbackVal = 0.0001;
+        const numeric = isFinite(parsed) ? parsed : fallbackVal;
+
+        // Clamp to HomeKit LightSensor allowed range: [0.0001, 100000]
+        const safeValue = Math.min(Math.max(0.0001, numeric), 100000);
+
         this.safeUpdate(service, Characteristic.CurrentAmbientLightLevel, safeValue);
     }
 
     // -------------------------------------------------------------------------
     // Helper for retrieving services.
-    //--------------------------------------------------------------------------
+    // Robustly tries accessory.getService(type, subtype) then falls back to scanning.
+    // -------------------------------------------------------------------------
     getServiceBySubtype(accessory, serviceType, subtype) {
-        if (accessory.getServiceById) {
-            return accessory.getServiceById(serviceType, subtype);
+        try {
+            // Preferred: some Homebridge versions support (type, subtype)
+            if (typeof accessory.getService === 'function') {
+                const svc = accessory.getService(serviceType, subtype);
+                if (svc) return svc;
+            }
+        } catch (e) {
+            // ignore and fallback to scanning
         }
-        return accessory.services.find(s => s.UUID === serviceType.UUID && s.subtype === subtype)
-            || accessory.getService(serviceType);
+
+        // Fallback: scan getServices() for exact subtype match
+        const services = accessory.getServices ? accessory.getServices() : [];
+        let found = services.find(s => s.UUID === serviceType.UUID && s.subtype === subtype);
+        if (found) return found;
+
+        // Last resort: return first matching serviceType (not ideal but safer than nothing)
+        return services.find(s => s.UUID === serviceType.UUID) || null;
     }
 
     // -------------------------------------------------------------------------
@@ -248,7 +269,7 @@ class SolisCloudPlatform {
 
     // -------------------------------------------------------------------------
     // Handles the Solis API authenticated POST request.
-    //--------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     async solisRequest(path, bodyObject) {
         const body = JSON.stringify(bodyObject);
         const contentMD5 = crypto.createHash("md5").update(body, "utf8").digest("base64");
