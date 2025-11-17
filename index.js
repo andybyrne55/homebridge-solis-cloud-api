@@ -106,6 +106,8 @@ class SolisCloudPlatform {
                 this.accessories.delete(uuid);
             }
         }
+
+        this.log.info(`[Solis] Platform launched — accessories initialised`);
     }
 
     // -------------------------------------------------------------------------
