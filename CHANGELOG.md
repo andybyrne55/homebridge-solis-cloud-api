@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 3.1.2 (2025-11-17)
+### Added
+- Versions not updating correctly. Sorted now
+
 ## 3.1.1 (2025-11-17)
 ### Added
 - Adding more comments to code so I can remember what everything is about in 6 months!
