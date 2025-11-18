@@ -1,6 +1,6 @@
 {
   "name": "homebridge-solis-cloud-api",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "description": "Homebridge plugin for reading data from Solis Cloud API for your inverter device",
   "main": "index.js",
   "keywords": [
@@ -26,6 +26,7 @@
     "url": "https://github.com/andybyrne55/homebridge-solis-cloud-api/issues"
   },
   "dependencies": {
+    "fakegato-history": "^0.6.7",
     "node-fetch": "^2.7.0"
   },
   "homebridge": {
@@ -35,13 +36,34 @@
         "name": "Solis Cloud API",
         "type": "object",
         "properties": {
-          "apiKey": { "type": "string", "title": "API Key" },
-          "apiSecret": { "type": "string", "title": "API Secret" },
-          "deviceId": { "type": "string", "title": "Device ID" },
-          "apiInterval": { "type": "number", "title": "API Poll Interval (s)", "default": 300 },
-          "room": { "type": "string", "title": "Room Name", "default": "Solar Dashboard" }
+          "apiKey": {
+            "type": "string",
+            "title": "API Key"
+          },
+          "apiSecret": {
+            "type": "string",
+            "title": "API Secret"
+          },
+          "deviceId": {
+            "type": "string",
+            "title": "Device ID"
+          },
+          "apiInterval": {
+            "type": "number",
+            "title": "API Poll Interval (s)",
+            "default": 300
+          },
+          "room": {
+            "type": "string",
+            "title": "Room Name",
+            "default": "Solar Dashboard"
+          }
         },
-        "required": ["apiKey", "apiSecret", "deviceId"]
+        "required": [
+          "apiKey",
+          "apiSecret",
+          "deviceId"
+        ]
       }
     ]
   }
