@@ -13,21 +13,21 @@ rooms
 
 This plugin exposes the following HomeKit sensors for automation compatibility and Eve app visibility:
 
-| Sensor / Characteristic | Description                               | Unit |
-|------------------------|-------------------------------------------|------|
-| PV Power               | Current PV generation                     | kW   |
-| Battery Power          | Current battery charge/discharge power    | kW   |
-| Battery %              | Current battery charge level              | %    |
-| House Load             | Current household load                    | kW   |
-| Grid Import            | Power imported from the grid              | kW   |
-| Grid Export            | Power exported to the grid                | kW   |
-| PV Today Energy        | PV energy generated today                 | kWh  |
-| PV Month Energy        | PV energy generated this month            | kWh  |
-| PV Year Energy         | PV energy generated this year             | kWh  |
-| PV Total Energy        | Total PV energy generated                 | kWh  |
-| Grid Purchased Today   | Grid energy purchased today               | kWh  |
-| Grid Sold Today        | Grid energy sold today                    | kWh  |
-| House Load Today       | Household energy used today               | kWh  |
+| Sensor / Characteristic | Description                               | Unit  |
+|------------------------|-------------------------------------------|-------|
+| PV Power               | Current PV generation                     | Watts |
+| Battery Power          | Current battery charge/discharge power    | Watts |
+| Battery %              | Current battery charge level              | %     |
+| House Load             | Current household load                    | Watts |
+| Grid Import            | Power imported from the grid              | Watts |
+| Grid Export            | Power exported to the grid                | Watts |
+| PV Today Energy        | PV energy generated today                 | kWh   |
+| PV Month Energy        | PV energy generated this month            | kWh   |
+| PV Year Energy         | PV energy generated this year             | kWh   |
+| PV Total Energy        | Total PV energy generated                 | kWh   |
+| Grid Purchased Today   | Grid energy purchased today               | kWh   |
+| Grid Sold Today        | Grid energy sold today                    | kWh   |
+| House Load Today       | Household energy used today               | kWh   |
 
 > All numeric sensors are **read-only** and automatically updated by the plugin.
 
