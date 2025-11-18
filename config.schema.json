@@ -13,21 +13,25 @@
       "apiKey": {
         "type": "string",
         "title": "API Key",
+        "description": "The **apiKey** and **apiSecret** values can be obtained by following [this guide from Solis](https://solis-service.solisinverters.com/en/support/solutions/articles/44002212561-request-api-access-soliscloud)",
         "required": true
       },
       "apiSecret": {
         "type": "string",
         "title": "API Secret",
+        "description": "The **apiKey** and **apiSecret** values can be obtained by following [this guide from Solis](https://solis-service.solisinverters.com/en/support/solutions/articles/44002212561-request-api-access-soliscloud)",
         "required": true
       },
       "deviceId": {
         "type": "string",
         "title": "Device ID",
+        "description": "Once you are granted access to the Solis Cloud API, obtain your **deviceId** by running the [solis_cloud_api-get_device_id.sh](https://github.com/andybyrne55/homebridge-solis-cloud-api/blob/main/solis_cloud_api-get_device_id.sh) script with your API credentials",
         "required": true
       },
       "apiInterval": {
         "type": "integer",
         "title": "API Poll Interval (seconds)",
+        "description": "How often to query the Solis Cloud API",
         "default": 300,
         "minimum": 60
       }
