@@ -138,14 +138,14 @@ class SolisCloudPlatform {
             accessory.displayName = metric.name;
             const service = this.getServiceBySubtype(accessory, Service.LightSensor, metric.idTag);
             if (!service) {
-                this.log.warn(`[Solis] Fixing service type for ${name}`);
+                this.log.warn(`[Solis] Fixing service type for ${metric.name}`);
                 // Remove old services if any exist (keep AccessoryInformation)
                 accessory.getServices().forEach(s => {
                     if (s.UUID !== Service.AccessoryInformation.UUID) {
-                        try { accessory.removeService(s); } catch (e) { /* ignore */ }
+                        try { accessory.removeService(s); } catch (e) {}
                     }
                 });
-                accessory.addService(Service.LightSensor, name, idTag);
+                accessory.addService(Service.LightSensor, metric.name, metric.idTag);
             }
         }
 
