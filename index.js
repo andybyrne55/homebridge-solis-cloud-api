@@ -1,41 +1,18 @@
 const crypto = require("crypto");
 const fetch = require("node-fetch");
-const fs = require("fs"); // Required by fakegato internally
 
 let Service, Characteristic;
-let FakeGatoHistoryService;
 
 // -----------------------------------------------------------------------------
-// CUSTOM EVE CHARACTERISTICS
-const EVE_POWER_CONSUMPTION_UUID = "E863F10D-079E-48FF-8F27-9C2605A29F52";
-
-// Wrapper class required by HomeKit/HAP to avoid UUID errors
-class EvePowerConsumptionCharacteristic extends Characteristic {
-    constructor() {
-        super('Power Consumption', EVE_POWER_CONSUMPTION_UUID);
-        this.setProps({
-            format: Characteristic.Formats.FLOAT,
-            perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY],
-            minValue: 0,
-            maxValue: 65535,
-            minStep: 0.1
-        });
-        this.value = 0;
-    }
-}
-
-// Required to trigger the "Power" graph UI in the Eve App
+// PLATFORM REGISTRATION (REQUIRED BY HOMEBRIDGE)
 // -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
-// PLATFORM REGISTRATION
+// Homebridge calls this once during plugin load. You *must*:
+// - Extract HAP Service and Characteristic
+// - Register the platform class
 // -----------------------------------------------------------------------------
 module.exports = (homebridge) => {
     Service = homebridge.hap.Service;
     Characteristic = homebridge.hap.Characteristic;
-
-    // Load FakeGato with the Homebridge API instance
-    FakeGatoHistoryService = require("fakegato-history")(homebridge);
 
     homebridge.registerPlatform("homebridge-solis-cloud-api", "SolisCloudAPI", SolisCloudPlatform, true);
 };
@@ -65,23 +42,22 @@ class SolisCloudPlatform {
         this.accessories = new Map();
 
         // Define metrics.
-        // Added 'graph: true' to instantaneous values we want to plot.
         this.metrics = [
-            { name: "PV Power Watts", idTag: "pvPower", graph: false },
-            { name: "Battery Power Watts", idTag: "batteryPower", graph: false },
-            { name: "Battery Percentage", idTag: "batteryPercent", graph: false }, // Will graph as 'W' in Eve, but visually useful
-            { name: "Grid Import Watts", idTag: "gridImport", graph: false },
-            { name: "Grid Export Watts", idTag: "gridExport", graph: false },
-            { name: "House Load Watts", idTag: "houseLoad", graph: false },
+            { name: "PV Power Watts", idTag: "pvPower"},
+            { name: "Battery Power Watts", idTag: "batteryPower"},
+            { name: "Battery Percentage", idTag: "batteryPercent"}, // Will graph as 'W' in Eve, but visually useful
+            { name: "Grid Import Watts", idTag: "gridImport"},
+            { name: "Grid Export Watts", idTag: "gridExport"},
+            { name: "House Load Watts", idTag: "houseLoad"},
 
             // Cumulative totals usually shouldn't be graphed as instantaneous 'power' lines
-            { name: "PV Today Energy kWh", idTag: "dayPvEnergy", graph: false },
-            { name: "PV Month Energy kWh", idTag: "monthPvEnergy", graph: false },
-            { name: "PV Year Energy kWh", idTag: "yearPvEnergy", graph: false },
-            { name: "PV Total Energy kWh", idTag: "totalPvEnergy", graph: false },
-            { name: "Grid Purchased Today kWh", idTag: "dayGridPurchased", graph: false },
-            { name: "Grid Sold Today kWh", idTag: "dayGridSold", graph: false },
-            { name: "House Load Today kWh", idTag: "dayHouseLoadEnergy", graph: false }
+            { name: "PV Today Energy kWh", idTag: "dayPvEnergy"},
+            { name: "PV Month Energy kWh", idTag: "monthPvEnergy"},
+            { name: "PV Year Energy kWh", idTag: "yearPvEnergy"},
+            { name: "PV Total Energy kWh", idTag: "totalPvEnergy"},
+            { name: "Grid Purchased Today kWh", idTag: "dayGridPurchased"},
+            { name: "Grid Sold Today kWh", idTag: "dayGridSold"},
+            { name: "House Load Today kWh", idTag: "dayHouseLoadEnergy"}
         ];
 
         if (!this.apiKey || !this.apiSecret || !this.deviceId) {
@@ -138,6 +114,7 @@ class SolisCloudPlatform {
         let accessory = this.accessories.get(uuid);
 
         if (!accessory) {
+            // Create new accessory
             accessory = new this.api.platformAccessory(metric.name, uuid);
 
             accessory.getService(Service.AccessoryInformation)
@@ -151,6 +128,7 @@ class SolisCloudPlatform {
             this.api.registerPlatformAccessories("homebridge-solis-cloud-api", "SolisCloudAPI", [accessory]);
             this.log.info(`[Solis] Created accessory: ${metric.name}`);
         } else {
+            // Restore accessory and ensure correct service
             accessory.displayName = metric.name;
             const service = this.getServiceBySubtype(accessory, Service.LightSensor, metric.idTag);
             if (!service) {
@@ -163,26 +141,6 @@ class SolisCloudPlatform {
                 });
                 accessory.addService(Service.LightSensor, metric.name, metric.idTag);
             }
-        }
-
-        // FAKEGATO SETUP
-        if (metric.graph) {
-            // 1. Ensure the Custom Eve Characteristic exists on the service
-            // Eve needs "Current Consumption" (UUID E863F10D...) to render the graph line properly
-            const service = this.getServiceBySubtype(accessory, Service.LightSensor, metric.idTag);
-            if (service) {
-                if (!service.testCharacteristic(EvePowerConsumptionCharacteristic)) {
-                    service.addCharacteristic(EvePowerConsumptionCharacteristic);
-                }
-            }
-
-            // 2. Initialize the History Service
-            // We use 'energy' type because it supports power graphs
-            accessory.context.loggingService = new FakeGatoHistoryService("energy", accessory, {
-                storage: 'fs',
-                log: this.log,
-                disableTimer: true // We will push entries manually when we fetch data
-            });
         }
 
         this.accessories.set(uuid, accessory);
@@ -261,23 +219,9 @@ class SolisCloudPlatform {
         const fallbackVal = 0.0001;
         const numeric = isFinite(parsed) ? parsed : fallbackVal;
 
-        // 1. Update HomeKit LightSensor (Lux)
+        // Update HomeKit LightSensor (Lux)
         const safeValue = Math.min(Math.max(0.0001, numeric), 100000);
         this.safeUpdate(service, Characteristic.CurrentAmbientLightLevel, safeValue);
-
-        // 2. Update Eve History (Graphs)
-        // Only if this metric is flagged for graphing (Watts / %)
-        if (metric.graph && accessory.context.loggingService) {
-            // Update the Custom Eve Characteristic (required for live view in Eve)
-            this.safeUpdate(service, EvePowerConsumptionCharacteristic, numeric);
-
-            // Add entry to history
-            // Fakegato 'energy' type expects { power: 123 }
-            accessory.context.loggingService.addEntry({
-                time: Math.round(new Date().valueOf() / 1000),
-                power: numeric
-            });
-        }
     }
 
     // -------------------------------------------------------------------------
