@@ -46,12 +46,12 @@ class SolisCloudPlatform {
         // Define all metrics here.
         // Battery is now treated exactly like the others (LightSensor).
         this.metrics = [
-            { name: "PV Power kW", idTag: "pvPower" },
-            { name: "Battery Power kW", idTag: "batteryPower" },
+            { name: "PV Power Watts", idTag: "pvPower" },
+            { name: "Battery Power Watts", idTag: "batteryPower" },
             { name: "Battery Percentage", idTag: "batteryPercent" },
-            { name: "Grid Import kW", idTag: "gridImport" },
-            { name: "Grid Export kW", idTag: "gridExport" },
-            { name: "House Load kW", idTag: "houseLoad" },
+            { name: "Grid Import Watts", idTag: "gridImport" },
+            { name: "Grid Export Watts", idTag: "gridExport" },
+            { name: "House Load Watts", idTag: "houseLoad" },
             { name: "PV Today Energy kWh", idTag: "dayPvEnergy" },
             { name: "PV Month Energy kWh", idTag: "monthPvEnergy" },
             { name: "PV Year Energy kWh", idTag: "yearPvEnergy" },
@@ -178,19 +178,19 @@ class SolisCloudPlatform {
 
             // Prepare Data Map
             const dataMap = {
-                pvPower: safe(r.power), // e.g. 0.000
-                batteryPower: safe(r.batteryPower), // e.g. 0.000
-                batteryPercent: safe(r.batteryPercent), // e.g. 18.0
-                gridImport: r.psum < 0 ? Math.abs(safe(r.psum)) : 0, // e.g. -0.380
-                gridExport: r.psum > 0 ? safe(r.psum) : 0, // e.g. -0.380
-                houseLoad: safe(r.familyLoadPower), // e.g. 0.380
-                dayPvEnergy: safe(r.dayEnergy), // e.g. 5.200
-                monthPvEnergy: safe(r.monthEnergy), // e.g. 112.500
-                yearPvEnergy: safe(r.yearEnergy), // e.g. 216.100
-                totalPvEnergy: safe(r.allEnergy), // e.g. 216.100
-                dayGridPurchased: safe(r.gridPurchasedDayEnergy), // e.g. 14.290
-                dayGridSold: safe(r.gridSellDayEnergy), // e.g. 0.070
-                dayHouseLoadEnergy: safe(r.homeLoadTodayEnergy) // e.g. 19.420
+                pvPower: safe(r.power) * 1000, // e.g. raw data is 0.000
+                batteryPower: safe(r.batteryPower) * 1000, // e.g. raw data is 0.000
+                batteryPercent: safe(r.batteryPercent), // e.g. raw data is 18.0
+                gridImport: r.psum < 0 ? Math.abs(safe(r.psum))  * 1000 : 0, // e.g. raw data is -0.380
+                gridExport: r.psum > 0 ? safe(r.psum)  * 1000 : 0, // e.g. raw data is -0.380
+                houseLoad: safe(r.familyLoadPower) * 1000, // e.g. raw data is 0.380
+                dayPvEnergy: safe(r.dayEnergy), // e.g. raw data is 5.200
+                monthPvEnergy: safe(r.monthEnergy), // e.g. raw data is 112.500
+                yearPvEnergy: safe(r.yearEnergy), // e.g. raw data is 216.100
+                totalPvEnergy: safe(r.allEnergy), // e.g. raw data is 216.100
+                dayGridPurchased: safe(r.gridPurchasedDayEnergy), // e.g. raw data is 14.290
+                dayGridSold: safe(r.gridSellDayEnergy), // e.g. raw data is 0.070
+                dayHouseLoadEnergy: safe(r.homeLoadTodayEnergy) // e.g. raw data is 19.420
             };
 
             const timestamp = new Date(safe(r.dataTimestamp, Date.now())).toLocaleString();

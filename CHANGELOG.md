@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 3.2.0 (2025-11-18)
+### Added
+- Changed power totals to use Watts, as it is more appropriate for smaller values
+
 ## 3.1.4 (2025-11-17)
 ### Added
 - Fixing schema
