@@ -7,9 +7,25 @@ let FakeGatoHistoryService;
 
 // -----------------------------------------------------------------------------
 // CUSTOM EVE CHARACTERISTICS
+const EVE_POWER_CONSUMPTION_UUID = "E863F10D-079E-48FF-8F27-9C2605A29F52";
+
+// Wrapper class required by HomeKit/HAP to avoid UUID errors
+class EvePowerConsumptionCharacteristic extends Characteristic {
+    constructor() {
+        super('Power Consumption', EVE_POWER_CONSUMPTION_UUID);
+        this.setProps({
+            format: Characteristic.Formats.FLOAT,
+            perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY],
+            minValue: 0,
+            maxValue: 65535,
+            minStep: 0.1
+        });
+        this.value = 0;
+    }
+}
+
 // Required to trigger the "Power" graph UI in the Eve App
 // -----------------------------------------------------------------------------
-const EVE_POWER_CONSUMPTION_UUID = "E863F10D-079E-48FF-8F27-9C2605A29F52"; // Watts
 
 // -----------------------------------------------------------------------------
 // PLATFORM REGISTRATION
@@ -51,12 +67,12 @@ class SolisCloudPlatform {
         // Define metrics.
         // Added 'graph: true' to instantaneous values we want to plot.
         this.metrics = [
-            { name: "PV Power Watts", idTag: "pvPower", graph: true },
-            { name: "Battery Power Watts", idTag: "batteryPower", graph: true },
-            { name: "Battery Percentage", idTag: "batteryPercent", graph: true }, // Will graph as 'W' in Eve, but visually useful
-            { name: "Grid Import Watts", idTag: "gridImport", graph: true },
-            { name: "Grid Export Watts", idTag: "gridExport", graph: true },
-            { name: "House Load Watts", idTag: "houseLoad", graph: true },
+            { name: "PV Power Watts", idTag: "pvPower", graph: false },
+            { name: "Battery Power Watts", idTag: "batteryPower", graph: false },
+            { name: "Battery Percentage", idTag: "batteryPercent", graph: false }, // Will graph as 'W' in Eve, but visually useful
+            { name: "Grid Import Watts", idTag: "gridImport", graph: false },
+            { name: "Grid Export Watts", idTag: "gridExport", graph: false },
+            { name: "House Load Watts", idTag: "houseLoad", graph: false },
 
             // Cumulative totals usually shouldn't be graphed as instantaneous 'power' lines
             { name: "PV Today Energy kWh", idTag: "dayPvEnergy", graph: false },
@@ -155,11 +171,8 @@ class SolisCloudPlatform {
             // Eve needs "Current Consumption" (UUID E863F10D...) to render the graph line properly
             const service = this.getServiceBySubtype(accessory, Service.LightSensor, metric.idTag);
             if (service) {
-                if (!service.testCharacteristic(EVE_POWER_CONSUMPTION_UUID)) {
-                    service.addCharacteristic(new Characteristic(EVE_POWER_CONSUMPTION_UUID, {
-                        format: Characteristic.Formats.FLOAT,
-                        perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY]
-                    }));
+                if (!service.testCharacteristic(EvePowerConsumptionCharacteristic)) {
+                    service.addCharacteristic(EvePowerConsumptionCharacteristic);
                 }
             }
 
@@ -256,7 +269,7 @@ class SolisCloudPlatform {
         // Only if this metric is flagged for graphing (Watts / %)
         if (metric.graph && accessory.context.loggingService) {
             // Update the Custom Eve Characteristic (required for live view in Eve)
-            this.safeUpdate(service, EVE_POWER_CONSUMPTION_UUID, numeric);
+            this.safeUpdate(service, EvePowerConsumptionCharacteristic, numeric);
 
             // Add entry to history
             // Fakegato 'energy' type expects { power: 123 }
