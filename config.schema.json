@@ -1,0 +1,36 @@
+{
+  "pluginAlias": "SolisCloudAPI",
+  "pluginType": "platform",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "title": "Name",
+        "default": "Solis Cloud API",
+        "required": true
+      },
+      "apiKey": {
+        "type": "string",
+        "title": "API Key",
+        "required": true
+      },
+      "apiSecret": {
+        "type": "string",
+        "title": "API Secret",
+        "required": true
+      },
+      "deviceId": {
+        "type": "string",
+        "title": "Device ID",
+        "required": true
+      },
+      "apiInterval": {
+        "type": "integer",
+        "title": "API Poll Interval (seconds)",
+        "default": 300,
+        "minimum": 60
+      }
+    }
+  }
+}

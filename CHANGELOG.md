@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 3.3.0 (2025-11-18)
+### Added
+- Using fake gato for instantaneous power values
+- fixing config auto populate
+- removing room, it doesn't work
+
 ## 3.2.0 (2025-11-18)
 ### Added
 - Changed power totals to use Watts, as it is more appropriate for smaller values
