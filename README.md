@@ -53,7 +53,7 @@ sudo systemctl restart homebridge
 Example Config:
 
 ```json
-"platforms": [
+"platforms" : [
     {
         "platform": "SolisCloudAPI",
         "name": "Solis Cloud API",
@@ -61,8 +61,7 @@ Example Config:
         "apiSecret": "YOUR_API_SECRET",
         "deviceId": "YOUR_DEVICE_ID",
         "baseUrl": "optional url, defaults to https://www.soliscloud.com:13333",
-        "apiInterval": 300,
-        "room": "an optional room name"
+        "apiInterval": 300
     }
 ]
 
