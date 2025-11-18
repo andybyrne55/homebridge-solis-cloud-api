@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const fetch = require("node-fetch");
 
-let Service, Characteristic;
+let Service, Characteristic, FakeGatoHistoryService;
 
 // -----------------------------------------------------------------------------
 // PLATFORM REGISTRATION (REQUIRED BY HOMEBRIDGE)
@@ -13,6 +13,8 @@ let Service, Characteristic;
 module.exports = (homebridge) => {
     Service = homebridge.hap.Service;
     Characteristic = homebridge.hap.Characteristic;
+
+    FakeGatoHistoryService = require("fakegato-history")(homebridge);
 
     homebridge.registerPlatform("homebridge-solis-cloud-api", "SolisCloudAPI", SolisCloudPlatform, true);
 };
@@ -42,22 +44,23 @@ class SolisCloudPlatform {
         this.accessories = new Map();
 
         // Define metrics.
+        // Added 'graph: true' to instantaneous values we want to plot.
         this.metrics = [
-            { name: "PV Power Watts", idTag: "pvPower"},
-            { name: "Battery Power Watts", idTag: "batteryPower"},
-            { name: "Battery Percentage", idTag: "batteryPercent"}, // Will graph as 'W' in Eve, but visually useful
-            { name: "Grid Import Watts", idTag: "gridImport"},
-            { name: "Grid Export Watts", idTag: "gridExport"},
-            { name: "House Load Watts", idTag: "houseLoad"},
+            { name: "PV Power Watts", idTag: "pvPower", graph: true },
+            { name: "Battery Power Watts", idTag: "batteryPower", graph: true },
+            { name: "Battery Percentage", idTag: "batteryPercent", graph: true }, // Will graph as 'W' in Eve, but visually useful
+            { name: "Grid Import Watts", idTag: "gridImport", graph: true },
+            { name: "Grid Export Watts", idTag: "gridExport", graph: true },
+            { name: "House Load Watts", idTag: "houseLoad", graph: true },
 
             // Cumulative totals usually shouldn't be graphed as instantaneous 'power' lines
-            { name: "PV Today Energy kWh", idTag: "dayPvEnergy"},
-            { name: "PV Month Energy kWh", idTag: "monthPvEnergy"},
-            { name: "PV Year Energy kWh", idTag: "yearPvEnergy"},
-            { name: "PV Total Energy kWh", idTag: "totalPvEnergy"},
-            { name: "Grid Purchased Today kWh", idTag: "dayGridPurchased"},
-            { name: "Grid Sold Today kWh", idTag: "dayGridSold"},
-            { name: "House Load Today kWh", idTag: "dayHouseLoadEnergy"}
+            { name: "PV Today Energy kWh", idTag: "dayPvEnergy", graph: false },
+            { name: "PV Month Energy kWh", idTag: "monthPvEnergy", graph: false },
+            { name: "PV Year Energy kWh", idTag: "yearPvEnergy", graph: false },
+            { name: "PV Total Energy kWh", idTag: "totalPvEnergy", graph: false },
+            { name: "Grid Purchased Today kWh", idTag: "dayGridPurchased", graph: false },
+            { name: "Grid Sold Today kWh", idTag: "dayGridSold", graph: false },
+            { name: "House Load Today kWh", idTag: "dayHouseLoadEnergy", graph: false }
         ];
 
         if (!this.apiKey || !this.apiSecret || !this.deviceId) {
@@ -144,6 +147,14 @@ class SolisCloudPlatform {
         }
 
         this.accessories.set(uuid, accessory);
+        if (metric.graph) {
+            if (!accessory.context.loggingService) {
+                this.log.debug(`[Solis] Setting up FakeGato for ${metric.name}`);
+                accessory.context.loggingService = new FakeGatoHistoryService("power", accessory, {
+                    log: this.log
+                });
+            }
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -222,6 +233,16 @@ class SolisCloudPlatform {
         // Update HomeKit LightSensor (Lux)
         const safeValue = Math.min(Math.max(0.0001, numeric), 100000);
         this.safeUpdate(service, Characteristic.CurrentAmbientLightLevel, safeValue);
+
+        const loggingService = accessory.context.loggingService;
+        if (metric.graph && loggingService) {
+            // FakeGato's 'power' type expects power in Watts (W).
+            // This is suitable for all your metrics (W and kWh).
+            loggingService.addEntry({
+                time: Math.round(new Date().valueOf() / 1000), // Current Unix time in seconds
+                power: numeric // Use the raw, safely parsed numeric value
+            });
+        }
     }
 
     // -------------------------------------------------------------------------
