@@ -34,7 +34,7 @@ class SolisCloudPlatform {
         this.config = config || {};
         this.api = api;
 
-        // --- USER CONFIGURATION ---
+        // User Configuration
         this.apiKey = this.config.apiKey;
         this.apiSecret = this.config.apiSecret;
         this.deviceId = this.config.deviceId;
@@ -147,12 +147,18 @@ class SolisCloudPlatform {
         }
 
         this.accessories.set(uuid, accessory);
+
+        // FakeGato Setup
         if (metric.graph) {
-            if (!accessory.context.loggingService) {
-                this.log.debug(`[Solis] Setting up FakeGato for ${metric.name}`);
-                accessory.context.loggingService = new FakeGatoHistoryService("power", accessory, {
+            if (!accessory.historyService) {
+                this.log.debug(`[Solis] Initialising FakeGato for ${metric.name}`);
+                accessory.historyService = new FakeGatoHistoryService("power", accessory, {
+                    storage: 'fs',
                     log: this.log
                 });
+
+                // ensure persistent data file is initialized
+                accessory.historyService.setExtraPersistedData({});
             }
         }
     }
@@ -208,7 +214,6 @@ class SolisCloudPlatform {
             }
 
             this.log.debug(`[Solis] Updated sensors. Timestamp: ${timestamp}. Details ${JSON.stringify(dataMap)}`);
-
         } catch (err) {
             this.log.error("[Solis] updateAllSensors failed:", err.message || err);
         }
@@ -231,16 +236,16 @@ class SolisCloudPlatform {
         const numeric = isFinite(parsed) ? parsed : fallbackVal;
 
         // Update HomeKit LightSensor (Lux)
+        // Lux cannot be 0 in HomeKit, so we ensure a minimum of 0.0001
         const safeValue = Math.min(Math.max(0.0001, numeric), 100000);
         this.safeUpdate(service, Characteristic.CurrentAmbientLightLevel, safeValue);
 
-        const loggingService = accessory.context.loggingService;
-        if (metric.graph && loggingService) {
-            // FakeGato's 'power' type expects power in Watts (W).
-            // This is suitable for all your metrics (W and kWh).
-            loggingService.addEntry({
+        // Push to FakeGato
+        if (metric.graph && accessory.historyService) {
+            this.log.debug(`[Solis] Logging to FakeGato for ${metric.name}`);
+            accessory.historyService.addEntry({
                 time: Math.round(new Date().valueOf() / 1000), // Current Unix time in seconds
-                power: numeric // Use the raw, safely parsed numeric value
+                power: numeric
             });
         }
     }
