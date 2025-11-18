@@ -52,11 +52,6 @@
             "type": "number",
             "title": "API Poll Interval (s)",
             "default": 300
-          },
-          "room": {
-            "type": "string",
-            "title": "Room Name",
-            "default": "Solar Dashboard"
           }
         },
         "required": [

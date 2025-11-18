@@ -45,7 +45,6 @@ class SolisCloudPlatform {
         this.deviceId = this.config.deviceId;
         this.baseUrl = this.config.baseUrl || "https://www.soliscloud.com:13333";
         this.apiInterval = this.config.apiInterval || 300;
-        this.room = this.config.room || "Solar Dashboard";
 
         this.accessories = new Map();
 
@@ -132,7 +131,6 @@ class SolisCloudPlatform {
                 .setCharacteristic(Characteristic.SerialNumber, `${this.deviceId}-${metric.idTag}`);
 
             accessory.addService(Service.LightSensor, metric.name, metric.idTag); // light sensor for all metrics
-            accessory.context.room = this.room;
 
             this.api.registerPlatformAccessories("homebridge-solis-cloud-api", "SolisCloudAPI", [accessory]);
             this.log.info(`[Solis] Created accessory: ${metric.name}`);
