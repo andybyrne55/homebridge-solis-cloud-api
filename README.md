@@ -1,9 +1,9 @@
 # homebridge-solis-cloud-api
 
 **A Homebridge plugin for Solis Cloud API** that exposes key energy metrics from your solar inverter to Apple Home. 
-Monitor PV generation, house load, grid interaction, and battery state directly in HomeKit. It is recommended to create
+Monitor PV generation, house load, grid interaction, and battery state directly in HomeKit. It is recommended to create 
 a new room for your "Solar Dashboard", so all the sensors are together in one place and do not clutter up your existing
-rooms
+rooms.
 
 > ⚠️ **Important:** The Solis API has rate limits. Do **not** set the apiInterval too low (default 300s). Excessive requests may get your API access temporarily blocked.
 
@@ -11,25 +11,34 @@ rooms
 
 ## Features
 
-This plugin exposes the following HomeKit sensors for automation compatibility and Eve app visibility:
+This plugin exposes the following metrics as LightSensors (so it is visible in standard Home app):
 
 | Sensor / Characteristic | Description                               | Unit  |
-|------------------------|-------------------------------------------|-------|
-| PV Power               | Current PV generation                     | Watts |
-| Battery Power          | Current battery charge/discharge power    | Watts |
-| Battery %              | Current battery charge level              | %     |
-| House Load             | Current household load                    | Watts |
-| Grid Import            | Power imported from the grid              | Watts |
-| Grid Export            | Power exported to the grid                | Watts |
-| PV Today Energy        | PV energy generated today                 | kWh   |
-| PV Month Energy        | PV energy generated this month            | kWh   |
-| PV Year Energy         | PV energy generated this year             | kWh   |
-| PV Total Energy        | Total PV energy generated                 | kWh   |
-| Grid Purchased Today   | Grid energy purchased today               | kWh   |
-| Grid Sold Today        | Grid energy sold today                    | kWh   |
-| House Load Today       | Household energy used today               | kWh   |
+|-------------------------|-------------------------------------------|-------|
+| PV Power                | Current PV generation                     | Watts |
+| Battery Power           | Current battery charge/discharge power    | Watts |
+| Battery %               | Current battery charge level              | %     |
+| House Load              | Current household load                    | Watts |
+| Grid Import             | Power imported from the grid              | Watts |
+| Grid Export             | Power exported to the grid                | Watts |
+| PV Today Energy         | PV energy generated today                 | kWh   |
+| PV Month Energy         | PV energy generated this month            | kWh   |
+| PV Year Energy          | PV energy generated this year             | kWh   |
+| PV Total Energy         | Total PV energy generated                 | kWh   |
+| Grid Purchased Today    | Grid energy purchased today               | kWh   |
+| Grid Sold Today         | Grid energy sold today                    | kWh   |
+| House Load Today        | Household energy used today               | kWh   |
 
 > All numeric sensors are **read-only** and automatically updated by the plugin.
+
+---
+
+## 📈 History Support (FakeGato)
+
+This plugin also uses **FakeGato** to store history for all instantaneous metrics
+(PV Power, Battery Power, House Load, Grid Import/Export).
+
+If you use the **Eve app**, you will see detailed historical graphs for these values.
 
 ---
 
