@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 3.4.1 (2025-11-18)
+### Added
+- Using "custom" and "lux" for FakeGato
+
 ## 3.4.0 (2025-11-18)
 ### Added
 - Reimplemented FakeGato

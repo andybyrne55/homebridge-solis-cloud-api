@@ -152,7 +152,7 @@ class SolisCloudPlatform {
         if (metric.graph) {
             if (!accessory.historyService) {
                 this.log.debug(`[Solis] Initialising FakeGato for ${metric.name}`);
-                accessory.historyService = new FakeGatoHistoryService("power", accessory, {
+                accessory.historyService = new FakeGatoHistoryService("custom", accessory, {
                     storage: 'fs',
                     log: this.log
                 });
@@ -245,7 +245,7 @@ class SolisCloudPlatform {
             this.log.debug(`[Solis] Logging to FakeGato for ${metric.name}`);
             accessory.historyService.addEntry({
                 time: Math.round(new Date().valueOf() / 1000), // Current Unix time in seconds
-                power: numeric
+                lux: numeric
             });
         }
     }
