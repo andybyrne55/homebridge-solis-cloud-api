@@ -116,8 +116,8 @@ class SolisCloudPlatform {
     ensureAccessory(metric, uuid) {
         let accessory = this.accessories.get(uuid);
 
+        // 1. Create the accessory if it doesn't exist
         if (!accessory) {
-            // Create new accessory
             accessory = new this.api.platformAccessory(metric.name, uuid);
 
             accessory.getService(Service.AccessoryInformation)
@@ -126,39 +126,47 @@ class SolisCloudPlatform {
                 .setCharacteristic(Characteristic.Model, "Metric Sensor")
                 .setCharacteristic(Characteristic.SerialNumber, `${this.deviceId}-${metric.idTag}`);
 
-            accessory.addService(Service.LightSensor, metric.name, metric.idTag); // light sensor for all metrics
+            // Initialize the context object if missing (safe place to store variables)
+            accessory.context = {};
+
+            // Add the new service
+            accessory.addService(Service.LightSensor, metric.name, metric.idTag);
 
             this.api.registerPlatformAccessories("homebridge-solis-cloud-api", "SolisCloudAPI", [accessory]);
             this.log.info(`[Solis] Created accessory: ${metric.name}`);
-        } else {
-            // Restore accessory and ensure correct service
+        }
+        else {
+            // 2. Existing Accessory: Update details
             accessory.displayName = metric.name;
-            const service = this.getServiceBySubtype(accessory, Service.LightSensor, metric.idTag);
-            if (!service) {
-                this.log.warn(`[Solis] Fixing service type for ${metric.name}`);
-                // Remove old services if any exist (keep AccessoryInformation)
-                accessory.getServices().forEach(s => {
-                    if (s.UUID !== Service.AccessoryInformation.UUID) {
-                        try { accessory.removeService(s); } catch (e) {}
-                    }
-                });
+
+            // Ensure context exists
+            accessory.context = accessory.context || {};
+
+            // Check if the specific LightSensor service exists
+            const existingService = accessory.getServiceByUUIDAndSubType(Service.LightSensor, metric.idTag);
+            if (!existingService) {
+                this.log.warn(`[Solis] Repairing service for ${metric.name}`);
+                const oldService = accessory.getService(Service.LightSensor);
+                if (oldService) {
+                    accessory.removeService(oldService);
+                }
+
+                // Add the fresh service
                 accessory.addService(Service.LightSensor, metric.name, metric.idTag);
             }
         }
 
         this.accessories.set(uuid, accessory);
 
-        // FakeGato Setup
+        // 3. FakeGato Setup
         if (metric.graph) {
+            // Only create if it doesn't already exist on the accessory object
             if (!accessory.historyService) {
                 this.log.debug(`[Solis] Initialising FakeGato for ${metric.name}`);
                 accessory.historyService = new FakeGatoHistoryService("custom", accessory, {
                     storage: 'fs',
                     log: this.log
                 });
-
-                // ensure persistent data file is initialized
-                accessory.historyService.setExtraPersistedData({});
             }
         }
     }
@@ -236,21 +244,33 @@ class SolisCloudPlatform {
 
         // Parse number safely
         const parsed = isFinite(Number(value)) ? Number(value) : NaN;
-        const fallbackVal = 0.0001;
-        const numeric = isFinite(parsed) ? parsed : fallbackVal;
+        const numeric = isFinite(parsed) ? parsed : 0.0001; // Fallback to tiny value, not 0
 
-        // Update HomeKit LightSensor (Lux)
-        // Lux cannot be 0 in HomeKit, so we ensure a minimum of 0.0001
+        // 2. Update HomeKit Instantaneous Value (The big number on the tile)
+        // We update this regardless of timestamp, just in case the UI is out of sync
         const safeValue = Math.min(Math.max(0.0001, numeric), 100000);
         this.safeUpdate(service, Characteristic.CurrentAmbientLightLevel, safeValue);
 
-        // Push to FakeGato
+        // 3. Push to FakeGato
         if (metric.graph && accessory.historyService) {
-            this.log.debug(`[Solis] Logging to FakeGato for ${metric.name}`);
-            accessory.historyService.addEntry({
-                time: Math.round(dataTimestampMillis / 1000),
-                lux: numeric
-            });
+            const entryTime = Math.round(dataTimestampMillis / 1000);
+            // specific context for this metric to track the last log time
+            accessory.context.logging = accessory.context.logging || {};
+            const lastTime = accessory.context.logging[metric.idTag] || 0;
+
+            // ONLY log if the new data is newer than the last logged data to prevent duplicate or invalid entries
+            if (entryTime > lastTime) {
+                this.log.debug(`[Solis] Logging ${metric.name}: ${numeric} (Time: ${entryTime})`);
+                accessory.historyService.addEntry({
+                    time: entryTime,
+                    lux: numeric
+                });
+
+                // Update our memory so we don't log this timestamp again
+                accessory.context.logging[metric.idTag] = entryTime;
+            } else {
+                this.log.debug(`[Solis] Skipping duplicate/stale data for ${metric.name}`);
+            }
         }
     }
 
