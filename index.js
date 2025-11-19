@@ -184,7 +184,10 @@ class SolisCloudPlatform {
             }
 
             const r = response.data.records[0];
-            const safe = (n, fallback = 0) => (typeof n === "number" && !isNaN(n) ? n : Number(n) || fallback);
+            const safe = (n, fallback = 0) => {
+                const val = Number(n);
+                return isNaN(val) ? fallback : val;
+            };
 
             // Prepare Data Map
             const dataMap = {
@@ -203,16 +206,17 @@ class SolisCloudPlatform {
                 dayHouseLoadEnergy: safe(r.homeLoadTodayEnergy) // e.g. raw data is 19.420
             };
 
-            const timestamp = new Date(safe(r.dataTimestamp, Date.now())).toLocaleString();
+            const dataTimestampMillis = safe(r.dataTimestamp, Date.now())
 
             // Update Sensor Values
             for (const metric of this.metrics) {
                 const val = dataMap[metric.idTag];
                 if (val !== undefined) {
-                    this.updateLightSensor(metric, val);
+                    this.updateLightSensor(metric, val, dataTimestampMillis);
                 }
             }
 
+            const timestamp = new Date(dataTimestampMillis).toLocaleString();
             this.log.debug(`[Solis] Updated sensors. Timestamp: ${timestamp}. Details ${JSON.stringify(dataMap)}`);
         } catch (err) {
             this.log.error("[Solis] updateAllSensors failed:", err.message || err);
@@ -222,7 +226,7 @@ class SolisCloudPlatform {
     // -------------------------------------------------------------------------
     // Pushes the value into the appropriate HomeKit service.
     // -------------------------------------------------------------------------
-    updateLightSensor(metric, value) {
+    updateLightSensor(metric, value, dataTimestampMillis) {
         const uuid = this.api.hap.uuid.generate(`solis-${this.deviceId}-${metric.idTag}`);
         const accessory = this.accessories.get(uuid);
         if (!accessory) return;
@@ -244,7 +248,7 @@ class SolisCloudPlatform {
         if (metric.graph && accessory.historyService) {
             this.log.debug(`[Solis] Logging to FakeGato for ${metric.name}`);
             accessory.historyService.addEntry({
-                time: Math.round(new Date().valueOf() / 1000), // Current Unix time in seconds
+                time: Math.round(dataTimestampMillis / 1000),
                 lux: numeric
             });
         }
