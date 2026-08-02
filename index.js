@@ -142,11 +142,17 @@ class SolisCloudPlatform {
             // Ensure context exists
             accessory.context = accessory.context || {};
 
-            // Check if the specific LightSensor service exists
-            const existingService = accessory.getServiceByUUIDAndSubType(Service.LightSensor, metric.idTag);
+            // Check if the specific LightSensor service exists.
+            // NOTE: getServiceByUUIDAndSubType() was removed in HAP-NodeJS v1.x (Homebridge v2).
+            // getServiceById(type, subtype) is the correct, long-standing replacement.
+            const existingService = accessory.getServiceById(Service.LightSensor, metric.idTag);
             if (!existingService) {
                 this.log.warn(`[Solis] Repairing service for ${metric.name}`);
-                const oldService = accessory.getService(Service.LightSensor);
+                // Only remove a service that actually belongs to this metric's subtype,
+                // not just "any" LightSensor on the accessory.
+                const oldService = accessory.services.find(
+                    s => s.UUID === Service.LightSensor.UUID && s.subtype === metric.idTag
+                );
                 if (oldService) {
                     accessory.removeService(oldService);
                 }
@@ -276,24 +282,21 @@ class SolisCloudPlatform {
 
     // -------------------------------------------------------------------------
     // Helper for retrieving services.
-    // Robustly tries accessory.getService(type, subtype) then falls back to scanning.
+    // Uses getServiceById(type, subtype), the correct API for matching both
+    // service type AND subtype (works on Homebridge v1 and v2).
+    // Falls back to scanning accessory.services directly for older/edge cases.
     // -------------------------------------------------------------------------
     getServiceBySubtype(accessory, serviceType, subtype) {
         try {
-            // Preferred: some Homebridge versions support (type, subtype)
-            if (typeof accessory.getService === 'function') {
-                const svc = accessory.getService(serviceType, subtype);
+            if (typeof accessory.getServiceById === 'function') {
+                const svc = accessory.getServiceById(serviceType, subtype);
                 if (svc) return svc;
             }
         } catch (e) {}
 
-        // Fallback: scan getServices() for exact subtype match
-        const services = accessory.getServices ? accessory.getServices() : [];
-        let found = services.find(s => s.UUID === serviceType.UUID && s.subtype === subtype);
-        if (found) return found;
-
-        // Last resort: return first matching serviceType (not ideal but safer than nothing)
-        return services.find(s => s.UUID === serviceType.UUID) || null;
+        // Fallback: scan services array for exact type + subtype match
+        const services = accessory.services || (accessory.getServices ? accessory.getServices() : []);
+        return services.find(s => s.UUID === serviceType.UUID && s.subtype === subtype) || null;
     }
 
     // -------------------------------------------------------------------------
