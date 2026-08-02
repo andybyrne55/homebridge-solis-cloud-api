@@ -1,6 +1,6 @@
 {
   "name": "homebridge-solis-cloud-api",
-  "version": "3.4.3",
+  "version": "3.4.4",
   "displayName": "Solis Cloud API",
   "description": "Homebridge plugin for reading data from Solis Cloud API for your inverter device",
   "main": "index.js",
@@ -13,8 +13,8 @@
     "energy-monitoring"
   ],
   "engines": {
-    "node": ">=16.0.0",
-    "homebridge": ">=1.6.0"
+    "node": "^18.20.4 || ^20.15.1 || ^22.12.0 || ^24.0.0",
+    "homebridge": "^1.6.0 || ^2.0.0"
   },
   "author": "Andrew Byrne",
   "license": "MIT",
