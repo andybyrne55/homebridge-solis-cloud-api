@@ -2,7 +2,7 @@
   "name": "homebridge-solis-cloud-api",
   "displayName": "Solis Cloud API",
   "type": "module",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "description": "Solis solar inverter data from SolisCloud in Apple Home: PV, battery, grid and house load, with history graphs, battery status and fault reporting.",
   "author": "Andrew Byrne",
   "license": "MIT",

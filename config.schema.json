@@ -11,19 +11,16 @@
         "type": "string",
         "title": "Name",
         "default": "Solis",
-        "required": true,
         "description": "Shown in the Homebridge log."
       },
       "apiKey": {
         "type": "string",
         "title": "API Key ID",
-        "required": true,
         "description": "Your SolisCloud API key ID (KeyId). See \"Getting API access\" in the README."
       },
       "apiSecret": {
         "type": "string",
         "title": "API Key Secret",
-        "required": true,
         "description": "Your SolisCloud API key secret (KeySecret)."
       },
       "stationId": {
@@ -119,7 +116,12 @@
         "default": false,
         "description": "Logs every update in detail."
       }
-    }
+    },
+    "required": [
+      "name",
+      "apiKey",
+      "apiSecret"
+    ]
   },
   "layout": [
     "name",

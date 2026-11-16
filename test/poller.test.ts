@@ -182,3 +182,19 @@ describe('config', () => {
     assert.match(warnings[0], /no metrics are selected/);
   });
 });
+
+describe('config schema', () => {
+  it('is standard JSON Schema and covers every option', async () => {
+    const { readFileSync } = await import('node:fs');
+    const schema = JSON.parse(readFileSync(new URL('../../config.schema.json', import.meta.url), 'utf8')) as {
+      pluginAlias: string; schema: { required: string[]; properties: Record<string, Record<string, unknown>> };
+    };
+    assert.equal(schema.pluginAlias, 'SolisCloudAPI');
+    assert.deepEqual(schema.schema.required, ['name', 'apiKey', 'apiSecret']);
+    for (const [key, prop] of Object.entries(schema.schema.properties)) {
+      assert.ok(!('required' in prop), `${key} has a per-field "required"`);
+    }
+    assert.deepEqual(Object.keys(schema.schema.properties).sort(), ['apiInterval', 'apiKey', 'apiSecret', 'baseUrl', 'debug', 'deviceId',
+      'faultWhenOffline', 'lowBatteryPercent', 'metrics', 'name', 'staleMinutes', 'stationId']);
+  });
+});

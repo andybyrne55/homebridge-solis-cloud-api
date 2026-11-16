@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 4.0.1 (2026-11-16)
+
+### Fixed
+- Settings schema: required fields are listed in a `required` array (standard JSON Schema) instead of per field.
+
 ## 4.0.0 (2026-11-16)
 
 Rewritten on the current Homebridge plugin template (TypeScript, tests, CI). Existing accessories, rooms, automations
