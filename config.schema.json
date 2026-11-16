@@ -1,39 +1,210 @@
 {
   "pluginAlias": "SolisCloudAPI",
   "pluginType": "platform",
+  "singular": true,
+  "headerDisplay": "Shows your Solis solar system from SolisCloud in Apple Home: PV, battery, grid and house load. You need SolisCloud API access – see the [README](https://github.com/andybyrne55/homebridge-solis-cloud-api#getting-api-access).",
+  "footerDisplay": "Each value is a light sensor tile (the lux reading is the value), so Home app automations can trigger when it rises above or drops below a level.",
   "schema": {
     "type": "object",
     "properties": {
       "name": {
         "type": "string",
         "title": "Name",
-        "default": "Solis Cloud API",
-        "required": true
+        "default": "Solis",
+        "required": true,
+        "description": "Shown in the Homebridge log."
       },
       "apiKey": {
         "type": "string",
-        "title": "API Key",
-        "description": "The apiKey and apiSecret can be obtained by following this guide from Solis: https://solis-service.solisinverters.com/en/support/solutions/articles/44002212561-request-api-access-soliscloud",
-        "required": true
+        "title": "API Key ID",
+        "required": true,
+        "description": "Your SolisCloud API key ID (KeyId). See \"Getting API access\" in the README."
       },
       "apiSecret": {
         "type": "string",
-        "title": "API Secret",
-        "required": true
+        "title": "API Key Secret",
+        "required": true,
+        "description": "Your SolisCloud API key secret (KeySecret)."
       },
-      "deviceId": {
+      "stationId": {
         "type": "string",
-        "title": "Device ID",
-        "description": "Once you are granted access to the Solis Cloud API, the deviceId can be obtained by running this script with your apiKey and apiSecret: https://github.com/andybyrne55/homebridge-solis-cloud-api/blob/main/solis_cloud_api-get_device_id.sh",
-        "required": true
+        "title": "Station ID",
+        "description": "Only needed if your SolisCloud account has more than one station. The log lists the stations it finds."
+      },
+      "metrics": {
+        "type": "array",
+        "title": "Sensors",
+        "uniqueItems": true,
+        "description": "Unticked sensors are removed from HomeKit.",
+        "items": {
+          "type": "string",
+          "enum": [
+            "pvPower",
+            "batteryPower",
+            "batteryDischarge",
+            "batteryPercent",
+            "gridImport",
+            "gridExport",
+            "houseLoad",
+            "dayPvEnergy",
+            "monthPvEnergy",
+            "yearPvEnergy",
+            "totalPvEnergy",
+            "dayGridPurchased",
+            "dayGridSold",
+            "dayHouseLoadEnergy"
+          ]
+        },
+        "default": [
+          "pvPower",
+          "batteryPower",
+          "batteryDischarge",
+          "batteryPercent",
+          "gridImport",
+          "gridExport",
+          "houseLoad",
+          "dayPvEnergy",
+          "monthPvEnergy",
+          "yearPvEnergy",
+          "totalPvEnergy",
+          "dayGridPurchased",
+          "dayGridSold",
+          "dayHouseLoadEnergy"
+        ]
+      },
+      "lowBatteryPercent": {
+        "type": "integer",
+        "title": "Low battery warning (%)",
+        "default": 20,
+        "minimum": 0,
+        "maximum": 100,
+        "description": "The Home app shows a low-battery warning at or below this level."
       },
       "apiInterval": {
         "type": "integer",
-        "title": "API Poll Interval (seconds)",
-        "description": "How often to query the Solis Cloud API",
+        "title": "Update interval (seconds)",
         "default": 300,
-        "minimum": 60
+        "minimum": 60,
+        "maximum": 3600,
+        "description": "SolisCloud receives new data from the inverter about every 5 minutes."
+      },
+      "staleMinutes": {
+        "type": "integer",
+        "title": "Report a fault after (minutes)",
+        "default": 30,
+        "minimum": 10,
+        "maximum": 1440,
+        "description": "The sensors show a fault when there has been no new data for this long."
+      },
+      "faultWhenOffline": {
+        "type": "boolean",
+        "title": "Report an offline inverter as a fault",
+        "default": true,
+        "description": "Untick if your inverter switches off at night (no battery), to avoid an overnight fault."
+      },
+      "baseUrl": {
+        "type": "string",
+        "title": "SolisCloud API address",
+        "placeholder": "https://www.soliscloud.com:13333",
+        "description": "Leave empty unless Solis gave you a different address."
+      },
+      "deviceId": {
+        "type": "string",
+        "title": "Device ID (from version 3)",
+        "description": "Keep this if you set it up in version 3: it keeps your existing tiles, rooms and automations. Not needed for new setups."
+      },
+      "debug": {
+        "type": "boolean",
+        "title": "Debug logging",
+        "default": false,
+        "description": "Logs every update in detail."
       }
     }
-  }
+  },
+  "layout": [
+    "name",
+    "apiKey",
+    {
+      "key": "apiSecret",
+      "type": "password"
+    },
+    "stationId",
+    {
+      "key": "metrics",
+      "type": "checkboxes",
+      "titleMap": [
+        {
+          "value": "pvPower",
+          "name": "PV Power Watts"
+        },
+        {
+          "value": "batteryPower",
+          "name": "Battery Charge Watts"
+        },
+        {
+          "value": "batteryDischarge",
+          "name": "Battery Discharge Watts"
+        },
+        {
+          "value": "batteryPercent",
+          "name": "Battery Percentage"
+        },
+        {
+          "value": "gridImport",
+          "name": "Grid Import Watts"
+        },
+        {
+          "value": "gridExport",
+          "name": "Grid Export Watts"
+        },
+        {
+          "value": "houseLoad",
+          "name": "House Load Watts"
+        },
+        {
+          "value": "dayPvEnergy",
+          "name": "PV Today Energy kWh"
+        },
+        {
+          "value": "monthPvEnergy",
+          "name": "PV Month Energy kWh"
+        },
+        {
+          "value": "yearPvEnergy",
+          "name": "PV Year Energy kWh"
+        },
+        {
+          "value": "totalPvEnergy",
+          "name": "PV Total Energy kWh"
+        },
+        {
+          "value": "dayGridPurchased",
+          "name": "Grid Purchased Today kWh"
+        },
+        {
+          "value": "dayGridSold",
+          "name": "Grid Sold Today kWh"
+        },
+        {
+          "value": "dayHouseLoadEnergy",
+          "name": "House Load Today kWh"
+        }
+      ]
+    },
+    "lowBatteryPercent",
+    {
+      "type": "fieldset",
+      "title": "Advanced",
+      "expandable": true,
+      "expanded": false,
+      "items": [
+        "apiInterval",
+        "staleMinutes",
+        "faultWhenOffline",
+        "baseUrl",
+        "deviceId",
+        "debug"
+      ]
+    }
+  ]
 }

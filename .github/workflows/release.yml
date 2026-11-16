@@ -1,0 +1,111 @@
+# Publishes to npm with trusted publishing (OIDC, no stored token) and creates the GitHub release.
+#
+# Triggered by pushing a tag vX.Y.Z (or a pre-release vX.Y.Z-beta.N) that matches package.json.
+# Pre-release versions are published under the "beta" dist-tag, others under "latest".
+#
+# One-time setup (owner):
+#  1. The package already exists on npm (versions up to 3.x were published by hand).
+#  2. On npmjs.com > homebridge-solis-cloud-api > Settings > Trusted publishing, add GitHub Actions:
+#     owner andybyrne55, repository homebridge-solis-cloud-api, workflow release.yml, environment npm.
+#     Configurations created after 3 Sep 2026 default to staged publishing; tick direct publishing too,
+#     or change NPM_PUBLISH_COMMAND below to "stage publish" and approve each release with 2FA.
+#  3. Complete one publish through this workflow within 2 days, or the configuration expires.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+env:
+  NPM_PUBLISH_COMMAND: publish
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        node-version: [22.x, 24.x, 26.x]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: write   # create the GitHub release
+      id-token: write   # npm trusted publishing (OIDC)
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          registry-url: https://registry.npmjs.org
+
+      - name: Use an npm CLI that supports trusted publishing and dist-tags
+        run: npm install -g npm@latest && npm --version
+
+      - name: Check the tag matches package.json
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $VERSION" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "$VERSION" == *-* ]]; then
+            echo "dist_tag=beta" >> "$GITHUB_OUTPUT"
+            echo "prerelease=--prerelease" >> "$GITHUB_OUTPUT"
+          else
+            echo "dist_tag=latest" >> "$GITHUB_OUTPUT"
+            echo "prerelease=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Extract the release notes from CHANGELOG.md
+        run: |
+          awk -v v="${{ steps.version.outputs.version }}" '
+            $0 ~ "^## \\[?" v "\\]?" { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "No CHANGELOG.md section for ${{ steps.version.outputs.version }}" >&2
+            exit 1
+          fi
+
+      - name: Publish to npm (skipped if this version is already published)
+        run: |
+          if npm view "homebridge-solis-cloud-api@${{ steps.version.outputs.version }}" version >/dev/null 2>&1; then
+            echo "Version ${{ steps.version.outputs.version }} is already on npm; skipping publish."
+          else
+            npm $NPM_PUBLISH_COMMAND --access public --provenance --tag ${{ steps.version.outputs.dist_tag }}
+          fi
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists; skipping."
+          else
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file release-notes.md ${{ steps.version.outputs.prerelease }}
+          fi

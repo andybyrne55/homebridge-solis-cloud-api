@@ -1,0 +1,20 @@
+{
+  "bridge": {
+    "name": "Solis Test Bridge",
+    "username": "0E:AA:BB:CC:DD:EE",
+    "port": 51899,
+    "pin": "031-45-154"
+  },
+  "accessories": [],
+  "platforms": [
+    {
+      "platform": "SolisCloudAPI",
+      "name": "Solis",
+      "apiKey": "test-key",
+      "apiSecret": "test-secret",
+      "baseUrl": "http://127.0.0.1:18080",
+      "apiInterval": 60,
+      "debug": true
+    }
+  ]
+}

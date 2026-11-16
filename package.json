@@ -1,33 +1,63 @@
 {
   "name": "homebridge-solis-cloud-api",
-  "version": "3.4.4",
   "displayName": "Solis Cloud API",
-  "description": "Homebridge plugin for reading data from Solis Cloud API for your inverter device",
-  "main": "index.js",
-  "keywords": [
-    "homebridge-plugin",
-    "homebridge-platform",
-    "solis",
-    "solar",
-    "inverter",
-    "energy-monitoring"
-  ],
-  "engines": {
-    "node": "^18.20.4 || ^20.15.1 || ^22.12.0 || ^24.0.0",
-    "homebridge": "^1.6.0 || ^2.0.0"
-  },
+  "type": "module",
+  "version": "4.0.0",
+  "description": "Solis solar inverter data from SolisCloud in Apple Home: PV, battery, grid and house load, with history graphs, battery status and fault reporting.",
   "author": "Andrew Byrne",
   "license": "MIT",
+  "homepage": "https://github.com/andybyrne55/homebridge-solis-cloud-api#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/andybyrne55/homebridge-solis-cloud-api.git"
   },
-  "homepage": "https://github.com/andybyrne55/homebridge-solis-cloud-api",
   "bugs": {
     "url": "https://github.com/andybyrne55/homebridge-solis-cloud-api/issues"
   },
+  "keywords": [
+    "homebridge-plugin",
+    "supports-hap",
+    "homebridge",
+    "homekit",
+    "solis",
+    "soliscloud",
+    "solar",
+    "inverter",
+    "battery",
+    "energy-monitoring"
+  ],
+  "main": "dist/index.js",
+  "files": [
+    "dist",
+    "config.schema.json",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": "^22.12.0 || ^24.0.0 || ^26.0.0",
+    "homebridge": "^1.8.0 || ^2.0.0"
+  },
+  "scripts": {
+    "build": "rimraf ./dist && tsc",
+    "build:test": "rimraf ./dist-test && tsc -p tsconfig.test.json",
+    "lint": "eslint . --max-warnings=0",
+    "test": "npm run build:test && node --test --test-concurrency=1 \"dist-test/test/**/*.test.js\"",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run lint && npm run build",
+    "watch": "npm run build && npm link && nodemon"
+  },
   "dependencies": {
-    "fakegato-history": "^0.6.7",
-    "node-fetch": "^2.7.0"
+    "fakegato-history": "^0.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.2.0",
+    "eslint": "^10.9.0",
+    "homebridge": "^2.5.0",
+    "nodemon": "^3.1.14",
+    "rimraf": "^6.1.3",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.67.0"
   }
 }
