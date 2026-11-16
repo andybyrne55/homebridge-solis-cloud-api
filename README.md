@@ -23,14 +23,16 @@ That is what makes it visible in the Home app and usable in automations.
 | Grid Import Watts | Power bought from the grid (W) | yes |
 | Grid Export Watts | Power sold to the grid (W) | yes |
 | House Load Watts | Power your home is using (W) | yes |
-| PV Today / Month / Year / Total Energy kWh | Solar energy produced (kWh) | – |
+| PV Today / Month / Year Energy kWh | Solar energy produced (kWh) | – |
+| PV Total Energy MWh | Solar energy produced since installation (MWh) | – |
 | Grid Purchased Today kWh | Energy bought today (kWh) | – |
 | Grid Sold Today kWh | Energy sold today (kWh) | – |
 | House Load Today kWh | Energy used today (kWh) | – |
 
 Untick the ones you don't need under **Sensors** in the plugin settings; they are removed from HomeKit.
 
-HomeKit cannot show 0 on a light sensor, so zero is shown as 0.0001 lux.
+HomeKit cannot show 0 on a light sensor, so zero is shown as 0.0001 lux. Its highest value is 100,000, which is why
+the lifetime total is in MWh.
 
 ### Battery status
 
@@ -110,8 +112,9 @@ Just update; keep your settings. Your existing tiles, rooms, automations and his
   showed discharging as 0 W. The Home app usually keeps the tile's old name, so rename it to "Battery Charge" yourself.
   Automations on it now act on the charge power. Charge history starts afresh (the old mixed history file,
   `…_Battery Power Watts_persist.json` in the Homebridge storage folder, can be deleted).
-- **PV Year Energy** and **PV Total Energy** are now correct: version 3 ignored that SolisCloud reports large totals in
-  MWh, so they were 1,000 times too small. Check automations that use them: the jump can trigger them.
+- **PV Year Energy** is now correct: version 3 ignored that SolisCloud reports large totals in MWh, so it was 1,000
+  times too small once it passed 1,000 kWh. **PV Total Energy** is now in MWh (rename the tile to match; the Home app
+  usually keeps the old name). Check automations that use them: the change can trigger them.
 - The Device ID is no longer needed for new setups (the plugin finds the station) and the setup script is gone.
 
 ## Privacy

@@ -57,7 +57,7 @@ describe('station parsing (scrubbed live capture)', () => {
 
   it('honours MWh units (year/total were 1000x too small before v4)', () => {
     assert.equal(reading.values.yearPvEnergy, 5643);
-    assert.equal(reading.values.totalPvEnergy, 6081);
+    assert.equal(reading.values.totalPvEnergy, 6.081, 'lifetime total in MWh');
     assert.equal(reading.values.monthPvEnergy, 103.6);
     assert.equal(reading.values.dayPvEnergy, 6.9);
   });

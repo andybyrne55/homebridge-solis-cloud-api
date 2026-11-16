@@ -28,7 +28,7 @@ export interface MetricDefinition {
   id: MetricId;
   /** Accessory name, also the name of its Eve history file (`<host>_<name>_persist.json`). */
   name: string;
-  unit: 'W' | 'kWh' | '%';
+  unit: 'W' | 'kWh' | 'MWh' | '%';
   /** Keep an Eve history graph (instantaneous values only). */
   history: boolean;
 }
@@ -45,7 +45,8 @@ export const METRICS: readonly MetricDefinition[] = [
   { id: 'dayPvEnergy', name: 'PV Today Energy kWh', unit: 'kWh', history: false },
   { id: 'monthPvEnergy', name: 'PV Month Energy kWh', unit: 'kWh', history: false },
   { id: 'yearPvEnergy', name: 'PV Year Energy kWh', unit: 'kWh', history: false },
-  { id: 'totalPvEnergy', name: 'PV Total Energy kWh', unit: 'kWh', history: false },
+  // Lifetime total in MWh: in kWh it would pass HomeKit's 100,000 limit within the life of a system.
+  { id: 'totalPvEnergy', name: 'PV Total Energy MWh', unit: 'MWh', history: false },
   { id: 'dayGridPurchased', name: 'Grid Purchased Today kWh', unit: 'kWh', history: false },
   { id: 'dayGridSold', name: 'Grid Sold Today kWh', unit: 'kWh', history: false },
   { id: 'dayHouseLoadEnergy', name: 'House Load Today kWh', unit: 'kWh', history: false },

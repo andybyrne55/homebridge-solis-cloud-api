@@ -99,7 +99,8 @@ export function parseStation(record: StationRecord): StationReading {
   set('dayPvEnergy', energy(record, 'dayEnergy'));
   set('monthPvEnergy', energy(record, 'monthEnergy'));
   set('yearPvEnergy', energy(record, 'yearEnergy'));
-  set('totalPvEnergy', energy(record, 'allEnergy'));
+  const total = energy(record, 'allEnergy');
+  set('totalPvEnergy', total === undefined ? undefined : total / 1000);
   set('dayGridPurchased', energy(record, 'gridPurchasedDayEnergy'));
   set('dayGridSold', energy(record, 'gridSellDayEnergy'));
   set('dayHouseLoadEnergy', energy(record, 'homeLoadTodayEnergy'));
