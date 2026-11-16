@@ -86,7 +86,7 @@ describe('poller', () => {
 
 describe('sensor status', () => {
   const reading = (over: Partial<StationReading> = {}): StationReading =>
-    ({ stationId: '1', stationName: 'S', state: 'online', dataTimestamp: 1_000_000, values: {}, ...over });
+    ({ stationId: '1', stationName: 'S', state: 'online', dataTimestamp: 1_000_000, hasBattery: true, values: {}, ...over });
   const base = { now: 1_000_000, startedAt: 0, lastSuccessAt: 1_000_000, staleMs: 30 * 60_000, faultWhenOffline: true };
 
   it('is fine with fresh data', () => {
@@ -164,6 +164,14 @@ describe('config', () => {
     const { config, warnings } = validateConfig({ ...ok, apiInterval: 900, staleMinutes: 10 });
     assert.equal(config!.staleMs, 30 * 60_000);
     assert.match(warnings[0], /shorter than two polls/);
+  });
+
+  it('keeps a v3 deviceId exactly (it is part of the accessory UUIDs) and caps long intervals', () => {
+    const { config, warnings } = validateConfig({ ...ok, deviceId: '1298 ', apiInterval: 7200 });
+    assert.equal(config!.deviceId, '1298 ');
+    assert.equal(config!.intervalMs, 3_600_000);
+    assert.match(warnings[0], /above 3600/);
+    assert.equal(validateConfig({ ...ok, deviceId: '  ' }).config!.deviceId, undefined);
   });
 
   it('reads ids and numbers given as strings, and an empty metric list', () => {

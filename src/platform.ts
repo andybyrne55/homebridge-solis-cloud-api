@@ -28,6 +28,9 @@ export class SolisCloudPlatform implements DynamicPlatformPlugin {
   private poller?: Poller;
   private statusTimer?: NodeJS.Timeout;
   private seed?: string;
+  /** Station the current accessories were built for (undefined: not known yet, e.g. a v3 cache). */
+  private seedStation?: string;
+  private stopped = false;
   private reading?: StationReading;
   private lastStatus?: SensorStatus;
   private historyClass?: FakeGatoHistoryConstructor;
@@ -77,12 +80,14 @@ export class SolisCloudPlatform implements DynamicPlatformPlugin {
       debug: (m) => this.log.debug(m),
     });
 
-    const remembered = [...this.cached.values()].map((a) => a.context.seed).find((s): s is string => typeof s === 'string' && s !== '');
+    const remembered = this.rememberedSeed();
+    const rememberedStation = this.rememberedStation();
     // Build straight away when the accessories are known (so they keep working while SolisCloud is down); a new or
     // changed station is confirmed by SolisCloud first, so a mistyped Station ID never creates accessories.
-    const seed = config.deviceId ?? (config.stationId && config.stationId !== remembered ? undefined : remembered);
+    const keepRemembered = !config.stationId || !rememberedStation || rememberedStation === config.stationId;
+    const seed = config.deviceId ?? (keepRemembered ? remembered : undefined);
     if (seed) {
-      this.buildAccessories(seed);
+      this.buildAccessories(seed, rememberedStation);
     } else {
       this.log.info('Looking for your station on SolisCloud…');
     }
@@ -91,9 +96,20 @@ export class SolisCloudPlatform implements DynamicPlatformPlugin {
     this.poller.start();
     this.statusTimer = setInterval(() => this.refreshStatus(), STATUS_CHECK_MS);
     this.statusTimer.unref();
+    this.refreshStatus();
+  }
+
+  /** Seed of the cached accessories (the v3 deviceId or the station id), so they are kept if deviceId is removed. */
+  private rememberedSeed(): string | undefined {
+    return [...this.cached.values()].map((a) => a.context.seed).find((s): s is string => typeof s === 'string' && s !== '');
+  }
+
+  private rememberedStation(): string | undefined {
+    return [...this.cached.values()].map((a) => a.context.stationId).find((s): s is string => typeof s === 'string' && s !== '');
   }
 
   private stop(): void {
+    this.stopped = true;
     this.poller?.stop();
     if (this.statusTimer) {
       clearInterval(this.statusTimer);
@@ -106,7 +122,10 @@ export class SolisCloudPlatform implements DynamicPlatformPlugin {
   private async update(): Promise<void> {
     const config = this.config!;
     const stations = await this.client!.listStations();
-    const remembered = [...this.cached.values()].map((a) => a.context.stationId).find((s): s is string => typeof s === 'string' && s !== '');
+    if (this.stopped) {
+      return;
+    }
+    const remembered = this.rememberedStation();
     let record: StationRecord;
     try {
       record = chooseStation(stations, config.stationId, this.reading?.stationId ?? remembered);
@@ -123,11 +142,14 @@ export class SolisCloudPlatform implements DynamicPlatformPlugin {
       this.log.info(`Showing station "${reading.stationName}" (${reading.stationId})${others}`);
     }
 
+    // Keep the accessories (and their rooms, automations, history) unless a different station is now shown.
     // New installs (no deviceId) identify their accessories by the station they show.
-    const seed = config.deviceId ?? reading.stationId;
+    const sameStation = this.seed !== undefined && (this.seedStation === undefined || this.seedStation === reading.stationId);
+    const seed = config.deviceId ?? (sameStation ? this.seed! : reading.stationId);
     if (seed !== this.seed) {
-      this.buildAccessories(seed);
+      this.buildAccessories(seed, reading.stationId);
     }
+    this.seedStation = reading.stationId;
 
     this.reading = reading;
     const dataTime = reading.dataTimestamp ? new Date(reading.dataTimestamp).toISOString() : 'unknown';
@@ -142,7 +164,7 @@ export class SolisCloudPlatform implements DynamicPlatformPlugin {
         missing.push(sensor.metric.name);
         continue;
       }
-      sensor.update(value, reading.dataTimestamp ?? Date.now(), reading.batteryCharging);
+      sensor.update(value, reading.dataTimestamp ?? Date.now(), reading.batteryCharging, reading.hasBattery);
     }
     if (missing.length) {
       this.log.debug(`Not reported by SolisCloud this time: ${missing.join(', ')}`);
@@ -176,9 +198,10 @@ export class SolisCloudPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  private buildAccessories(seed: string): void {
+  private buildAccessories(seed: string, station?: string): void {
     const config = this.config!;
     this.seed = seed;
+    this.seedStation = station;
     this.sensors.clear();
     const keep = new Set<string>();
     const created: PlatformAccessory<MetricContext>[] = [];
@@ -205,6 +228,8 @@ export class SolisCloudPlatform implements DynamicPlatformPlugin {
       this.sensors.set(uuid, sensor);
       if (this.lastStatus) {
         sensor.setStatus(this.lastStatus);
+      } else {
+        sensor.setStatus({ active: true, fault: false });
       }
     }
 
@@ -218,7 +243,7 @@ export class SolisCloudPlatform implements DynamicPlatformPlugin {
     }
     const stale = [...this.cached.values()].filter((a) => !keep.has(a.UUID));
     if (stale.length) {
-      this.log.info(`Removing ${stale.map((a) => `"${a.displayName}"`).join(', ')} (not selected in the settings)`);
+      this.log.info(`Removing ${stale.map((a) => `"${a.displayName}"`).join(', ')} (no longer used)`);
       this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, stale);
       for (const a of stale) {
         this.cached.delete(a.UUID);

@@ -98,14 +98,22 @@ describe('metric accessory (real HAP-NodeJS)', () => {
     assert.deepEqual(history.entries, []);
   });
 
-  it('adds a battery service to Battery Percentage', () => {
+  it('adds no battery service while the station shows no battery', () => {
     const { sensor, accessory } = setup('batteryPercent');
+    sensor.update(0, undefined, false, false);
+    assert.equal(accessory.getService(S.Battery), undefined);
+    assert.equal(accessory.context.hasBattery, undefined);
+  });
+
+  it('adds a battery service to Battery Percentage once a battery is seen', () => {
+    const { sensor, accessory } = setup('batteryPercent');
+    sensor.update(78, undefined, false, true);
     const battery = accessory.getService(S.Battery)!;
-    sensor.update(78, undefined, false);
+    assert.equal(accessory.context.hasBattery, true);
     assert.equal(battery.getCharacteristic(C.BatteryLevel).value, 78);
     assert.equal(battery.getCharacteristic(C.StatusLowBattery).value, C.StatusLowBattery.BATTERY_LEVEL_NORMAL);
     assert.equal(battery.getCharacteristic(C.ChargingState).value, C.ChargingState.NOT_CHARGING);
-    sensor.update(19.6, undefined, true);
+    sensor.update(19.6, undefined, true, true);
     assert.equal(battery.getCharacteristic(C.BatteryLevel).value, 20);
     assert.equal(battery.getCharacteristic(C.StatusLowBattery).value, C.StatusLowBattery.BATTERY_LEVEL_LOW);
     assert.equal(battery.getCharacteristic(C.ChargingState).value, C.ChargingState.CHARGING);
@@ -135,9 +143,11 @@ describe('metric accessory (real HAP-NodeJS)', () => {
   });
 
   it('is idempotent on restart (cached accessory)', () => {
-    const { accessory } = setup('batteryPercent');
+    const { accessory, sensor } = setup('batteryPercent');
+    sensor.update(50, undefined, true, true);
     const count = accessory.services.length;
-    setup('batteryPercent', accessory);
+    const again = setup('batteryPercent', accessory);
     assert.equal(accessory.services.length, count);
+    assert.ok(again.sensor.battery, 'battery service restored from the cache');
   });
 });

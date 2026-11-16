@@ -83,7 +83,7 @@ jobs:
       - name: Extract the release notes from CHANGELOG.md
         run: |
           awk -v v="${{ steps.version.outputs.version }}" '
-            $0 ~ "^## \\[?" v "\\]?" { found = 1; next }
+            index($0, "## " v " ") == 1 || $0 == "## " v || index($0, "## [" v "]") == 1 { found = 1; next }
             found && /^## / { exit }
             found { print }
           ' CHANGELOG.md > release-notes.md

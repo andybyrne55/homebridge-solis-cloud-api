@@ -16,6 +16,8 @@ export interface StationReading {
   state: StationState;
   /** Battery is charging (only when the station reports battery power). */
   batteryCharging?: boolean;
+  /** The station shows signs of a battery (a charge level or battery power). Stations without one report zeros. */
+  hasBattery: boolean;
   /** Values per metric, in W, kWh or %. A metric is missing when SolisCloud did not report it (or in an unknown unit). */
   values: Partial<Record<MetricId, number>>;
 }
@@ -103,12 +105,15 @@ export function parseStation(record: StationRecord): StationReading {
   set('dayHouseLoadEnergy', energy(record, 'homeLoadTodayEnergy'));
 
   const ts = toNumber(record.dataTimestamp);
+  // Ignore absurd timestamps (before 2000 or more than a day ahead) rather than trusting or crashing on them.
+  const validTs = ts !== undefined && ts > 946_684_800_000 && ts < Date.now() + 86_400_000 ? ts : undefined;
   return {
     stationId: id,
     stationName: stationName(record),
-    dataTimestamp: ts !== undefined && ts > 0 ? ts : undefined,
+    dataTimestamp: validTs,
     state: stateOf(record),
     batteryCharging,
+    hasBattery: (percent ?? 0) > 0 || (battery ?? 0) !== 0,
     values,
   };
 }

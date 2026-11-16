@@ -105,7 +105,15 @@ export function validateConfig(raw: unknown): ValidationResult {
     return n;
   };
 
-  const apiInterval = range('apiInterval', c.apiInterval, DEFAULTS.minApiInterval, DEFAULTS.maxApiInterval, DEFAULTS.apiInterval);
+  // Version 3 had no upper limit: longer intervals are capped rather than reset.
+  const rawInterval = num(c.apiInterval);
+  let apiInterval: number;
+  if (rawInterval !== undefined && Number.isInteger(rawInterval) && rawInterval > DEFAULTS.maxApiInterval) {
+    warnings.push(`"apiInterval" ${rawInterval} is above ${DEFAULTS.maxApiInterval}; using ${DEFAULTS.maxApiInterval}`);
+    apiInterval = DEFAULTS.maxApiInterval;
+  } else {
+    apiInterval = range('apiInterval', c.apiInterval, DEFAULTS.minApiInterval, DEFAULTS.maxApiInterval, DEFAULTS.apiInterval);
+  }
   const lowBatteryPercent = range('lowBatteryPercent', c.lowBatteryPercent, 0, 100, DEFAULTS.lowBatteryPercent);
   let staleMinutes = range('staleMinutes', c.staleMinutes, DEFAULTS.minStaleMinutes, DEFAULTS.maxStaleMinutes, DEFAULTS.staleMinutes);
   // Allow at least two missed polls before calling the data stale.
@@ -157,7 +165,8 @@ export function validateConfig(raw: unknown): ValidationResult {
       apiSecret,
       baseUrl,
       stationId: str(c.stationId),
-      deviceId: str(c.deviceId),
+      // v3 used the raw string in the UUID seed: keep it exactly (even stray spaces), or the accessories would change.
+      deviceId: typeof c.deviceId === 'string' ? (c.deviceId.trim() ? c.deviceId : undefined) : str(c.deviceId),
       intervalMs: apiInterval * 1000,
       metrics,
       lowBatteryPercent,

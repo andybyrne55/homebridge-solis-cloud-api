@@ -52,7 +52,7 @@ export function signRequest(apiKey: string, apiSecret: string, path: string, bod
   const signature = createHmac('sha1', apiSecret).update(toSign, 'utf8').digest('base64');
   return {
     'Content-MD5': contentMd5,
-    'Content-Type': 'application/json',
+    'Content-Type': 'application/json;charset=UTF-8',
     Date: date,
     Authorization: `API ${apiKey}:${signature}`,
   };

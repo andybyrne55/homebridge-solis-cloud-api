@@ -19,6 +19,8 @@ export interface MetricContext {
   /** Seed used for the UUID (deviceId or station id). */
   seed?: string;
   stationId?: string;
+  /** A battery has been seen on the station (adds the Battery service to Battery Percentage). */
+  hasBattery?: boolean;
   /** Last history entry time per metric (s). The name predates v4. */
   logging?: Record<string, number>;
 }
@@ -44,7 +46,7 @@ export function toLux(value: number): number {
 
 export class MetricAccessory {
   readonly sensor: Service;
-  readonly battery?: Service;
+  battery?: Service;
   private readonly history?: History;
 
   constructor(
@@ -65,7 +67,7 @@ export class MetricAccessory {
     // Remove anything that does not belong to this metric (older versions, metric changes).
     for (const service of [...accessory.services]) {
       const strayLight = service.UUID === S.LightSensor.UUID && service.subtype !== metric.id;
-      const strayBattery = service.UUID === S.Battery.UUID && metric.id !== 'batteryPercent';
+      const strayBattery = service.UUID === S.Battery.UUID && (metric.id !== 'batteryPercent' || !accessory.context.hasBattery);
       if (strayLight || strayBattery) {
         accessory.removeService(service);
       }
@@ -77,10 +79,8 @@ export class MetricAccessory {
     this.sensor.getCharacteristic(C.StatusActive);
     this.sensor.getCharacteristic(C.StatusFault);
 
-    if (metric.id === 'batteryPercent') {
-      this.battery = accessory.getService(S.Battery) ?? accessory.addService(S.Battery, 'Battery', 'battery');
-      this.battery.setCharacteristic(C.Name, 'Battery');
-      this.battery.getCharacteristic(C.ChargingState).updateValue(C.ChargingState.NOT_CHARGING);
+    if (metric.id === 'batteryPercent' && accessory.context.hasBattery) {
+      this.addBatteryService();
     }
 
     if (metric.history) {
@@ -91,9 +91,15 @@ export class MetricAccessory {
   /**
    * Shows a new value. `time` is when SolisCloud received it (ms); history only gets values newer than the last entry.
    */
-  update(value: number, time: number | undefined, batteryCharging?: boolean): void {
+  update(value: number, time: number | undefined, batteryCharging?: boolean, hasBattery?: boolean): void {
     const C = this.options.hap.Characteristic;
     this.sensor.updateCharacteristic(C.CurrentAmbientLightLevel, toLux(value));
+
+    // Stations without a battery report 0 %: no battery status for them (it would warn "low battery" forever).
+    if (this.metric.id === 'batteryPercent' && hasBattery && !this.battery) {
+      this.accessory.context.hasBattery = true;
+      this.addBatteryService();
+    }
 
     if (this.battery) {
       const level = Math.round(Math.min(Math.max(value, 0), 100));
@@ -116,6 +122,13 @@ export class MetricAccessory {
         ctx.logging[this.metric.id] = entryTime;
       }
     }
+  }
+
+  private addBatteryService(): void {
+    const { Service: S, Characteristic: C } = this.options.hap;
+    this.battery = this.accessory.getService(S.Battery) ?? this.accessory.addService(S.Battery, 'Battery', 'battery');
+    this.battery.setCharacteristic(C.Name, 'Battery');
+    this.battery.getCharacteristic(C.ChargingState).updateValue(C.ChargingState.NOT_CHARGING);
   }
 
   setStatus(status: SensorStatus): void {

@@ -34,8 +34,9 @@ HomeKit cannot show 0 on a light sensor, so zero is shown as 0.0001 lux.
 
 ### Battery status
 
-The Battery Percentage sensor also has a **battery** status: the Home app shows the level, whether it is charging,
-and a **low battery** warning at or below the level you set (default 20 %).
+Once SolisCloud reports a battery, the Battery Percentage sensor also gets a **battery** status: the Home app shows
+the level, whether it is charging, and a **low battery** warning at or below the level you set (default 20 %).
+No battery? Untick the three battery sensors.
 
 ### Faults
 
@@ -106,10 +107,11 @@ Everything can be set in the Homebridge UI. Minimal `config.json`:
 Just update; keep your settings. Your existing tiles, rooms, automations and history stay. What changes:
 
 - **Battery Power Watts is now Battery Charge Watts**, and there is a new **Battery Discharge Watts** sensor. Version 3
-  showed discharging as 0 W. Automations on the old sensor now act on the charge power. Charge history starts afresh
-  (the old mixed history file, `…_Battery Power Watts_persist.json` in the Homebridge storage folder, can be deleted).
+  showed discharging as 0 W. The Home app usually keeps the tile's old name, so rename it to "Battery Charge" yourself.
+  Automations on it now act on the charge power. Charge history starts afresh (the old mixed history file,
+  `…_Battery Power Watts_persist.json` in the Homebridge storage folder, can be deleted).
 - **PV Year Energy** and **PV Total Energy** are now correct: version 3 ignored that SolisCloud reports large totals in
-  MWh, so they were 1,000 times too small. Check automations that use them.
+  MWh, so they were 1,000 times too small. Check automations that use them: the jump can trigger them.
 - The Device ID is no longer needed for new setups (the plugin finds the station) and the setup script is gone.
 
 ## Privacy

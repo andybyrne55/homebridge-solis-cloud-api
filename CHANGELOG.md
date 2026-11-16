@@ -8,10 +8,11 @@ Rewritten on the current Homebridge plugin template (TypeScript, tests, CI). Exi
 and history are kept; see "Upgrading from version 3" in the README.
 
 ### Fixed
-- Battery discharge was shown as 0 W. Battery Power Watts is now **Battery Charge Watts**, plus a new
-  **Battery Discharge Watts** sensor.
+- Battery discharge was shown as 0 W. Battery Power Watts is now **Battery Charge Watts** (the Home app usually keeps
+  the old tile name; rename it yourself), plus a new **Battery Discharge Watts** sensor.
 - Values reported in other units were misread: PV Year and PV Total Energy (reported in MWh) were 1,000 times too small.
-  All values are now converted using the unit SolisCloud sends with them.
+  All values are now converted using the unit SolisCloud sends with them. Automations on these values may trigger
+  on the jump.
 - The configured Device ID was sent to SolisCloud as a filter it does not support; the first station was always used.
   The plugin now finds the station itself (optional Station ID for accounts with several).
 - Polling now stops when Homebridge shuts down.
@@ -19,7 +20,8 @@ and history are kept; see "Upgrading from version 3" in the README.
 
 ### Added
 - Choose which sensors to show.
-- Battery status on Battery Percentage: level, charging and a low-battery warning (configurable level).
+- Battery status on Battery Percentage (when the station has a battery): level, charging and a low-battery warning
+  (configurable level).
 - Fault status on every sensor when the data is not current, the inverter is offline or SolisCloud reports an alarm.
 - Requests time out after 15 s and are retried once; repeated failures back off (up to 4× the interval) and are
   logged once per outage, with a message when updates work again.

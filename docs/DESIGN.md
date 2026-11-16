@@ -40,7 +40,8 @@ because the old one mixes charge and discharge.
 
 ## New features
 - **Pick your metrics** (`metrics`, default all): unticked metrics are removed from HomeKit.
-- **Battery service** on the Battery Percentage accessory: Battery Level, Charging State, Low Battery (threshold
+- **Battery service** on the Battery Percentage accessory, added once a battery is seen (percentage > 0 or battery
+  power ≠ 0; remembered in the accessory context) so stations without one don't warn "low battery" forever: Battery Level, Charging State, Low Battery (threshold
   `lowBatteryPercent`, default 20). The Home app shows the level and raises a low-battery warning.
 - **Fault reporting:** every sensor shows StatusActive/StatusFault. Fault (and inactive) when SolisCloud has not
   answered for `staleMinutes` (default 30). Fault when SolisCloud reports an alarm (`state` 3). Inactive, and a fault

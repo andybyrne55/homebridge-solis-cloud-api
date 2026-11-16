@@ -46,6 +46,13 @@ describe('station parsing (scrubbed live capture)', () => {
     assert.equal(reading.values.batteryDischarge, 519);
     assert.equal(reading.batteryCharging, false);
     assert.equal(reading.values.batteryPercent, 78);
+    assert.equal(reading.hasBattery, true);
+  });
+
+  it('recognises a station without a battery and ignores absurd timestamps', () => {
+    const r = parseStation({ ...fixture(), batteryPercent: 0, batteryPower: 0, dataTimestamp: '99999999999999999' });
+    assert.equal(r.hasBattery, false);
+    assert.equal(r.dataTimestamp, undefined);
   });
 
   it('honours MWh units (year/total were 1000x too small before v4)', () => {

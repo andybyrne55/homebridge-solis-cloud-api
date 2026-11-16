@@ -64,11 +64,19 @@ describe('platform', () => {
     dir = mkdtempSync(join(tmpdir(), 'solis-'));
   });
   const apis: FakeApi[] = [];
+  const warnings: string[] = [];
+  const original = { warn: console.warn, error: console.error };
+  before(() => {
+    console.warn = (...args: unknown[]) => warnings.push(args.join(' '));
+    console.error = (...args: unknown[]) => warnings.push(args.join(' '));
+  });
   after(async () => {
     // fakegato-history keeps the last Homebridge API it was given, so its shared timer can end up on any of them.
     for (const api of apis) {
       (api as unknown as { globalFakeGatoTimer?: { stop(): void } }).globalFakeGatoTimer?.stop();
     }
+    console.warn = original.warn;
+    console.error = original.error;
     await server.stop();
     rmSync(dir, { recursive: true, force: true });
   });
@@ -133,6 +141,37 @@ describe('platform', () => {
     assert.equal(second.api.unregistered.length, 0);
   });
 
+  it('keeps the v3 accessories when deviceId is removed from the config later', async () => {
+    server.replies = [{ kind: 'stations', records: [{ ...fixture(), dataTimestamp: String(Date.now()) }] }];
+    const cached = [v3Accessory('DEV', 'pvPower', 'PV Power Watts')];
+    const first = launch({ deviceId: 'DEV', metrics: ['pvPower'] }, cached);
+    try {
+      await until(() => first.lines.some((l) => l.includes('Showing station')));
+    } finally {
+      first.stop();
+    }
+    const second = launch({ metrics: ['pvPower'] }, cached);
+    try {
+      await until(() => second.lines.some((l) => l.includes('Showing station')));
+    } finally {
+      second.stop();
+    }
+    assert.equal(second.api.registered.length, 0);
+    assert.equal(second.api.unregistered.length, 0);
+    assert.equal(cached[0].getServiceById(S.LightSensor, 'pvPower')!.getCharacteristic(C.CurrentAmbientLightLevel).value, 10);
+  });
+
+  it('a station without a battery gets no battery status', async () => {
+    server.replies = [{ kind: 'stations', records: [{ ...fixture(), batteryPercent: 0, batteryPower: 0, dataTimestamp: String(Date.now()) }] }];
+    const { api, lines, stop } = launch({ deviceId: 'NOBAT', metrics: ['batteryPercent'] });
+    try {
+      await until(() => lines.some((l) => l.includes('Showing station')));
+    } finally {
+      stop();
+    }
+    assert.equal((api.registered[0] as unknown as FakePlatformAccessory).getService(S.Battery), undefined);
+  });
+
   it('removes sensors that are unticked', async () => {
     server.replies = [{ kind: 'stations', records: [{ ...fixture(), dataTimestamp: String(Date.now()) }] }];
     const cached = [v3Accessory('DEV', 'pvPower', 'PV Power Watts'), v3Accessory('DEV', 'houseLoad', 'House Load Watts')];
@@ -161,5 +200,9 @@ describe('platform', () => {
       stop();
     }
     assert.equal(api.registered.length, 0);
+  });
+
+  it('printed no HAP or fakegato warnings', () => {
+    assert.deepEqual(warnings.filter((w) => !w.includes('Fakegato')), []);
   });
 });

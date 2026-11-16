@@ -10,7 +10,7 @@
     "declaration": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "sourceMap": true,
+    "sourceMap": false,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true
