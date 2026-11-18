@@ -2,6 +2,7 @@
 
 [![Build, lint and test](https://github.com/andybyrne55/homebridge-solis-cloud-api/actions/workflows/build.yml/badge.svg)](https://github.com/andybyrne55/homebridge-solis-cloud-api/actions/workflows/build.yml)
 [![npm](https://img.shields.io/npm/v/homebridge-solis-cloud-api)](https://www.npmjs.com/package/homebridge-solis-cloud-api)
+[![verified-by-homebridge](https://img.shields.io/badge/homebridge-verified-blueviolet?color=%23491F59&style=flat)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins)
 
 Your **Solis** solar inverter in Apple Home, through [Homebridge](https://homebridge.io) and the SolisCloud API:
 solar (PV) power, battery charge and discharge, battery level, grid import and export, house load and daily/monthly/yearly
